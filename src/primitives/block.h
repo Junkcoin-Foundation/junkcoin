@@ -10,6 +10,8 @@
 #include <serialize.h>
 #include <uint256.h>
 #include <mweb/mweb_models.h>
+#include <memory>
+#include <auxpow.h>
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
@@ -29,12 +31,78 @@ public:
     uint32_t nBits;
     uint32_t nNonce;
 
+    // AuxPoW
+    std::shared_ptr<CAuxPow> auxpow;
+
     CBlockHeader()
     {
         SetNull();
     }
 
-    SERIALIZE_METHODS(CBlockHeader, obj) { READWRITE(obj.nVersion, obj.hashPrevBlock, obj.hashMerkleRoot, obj.nTime, obj.nBits, obj.nNonce); }
+    // AuxPoW helper methods
+    static const int32_t VERSION_AUXPOW = (1 << 8);
+    static const int32_t VERSION_CHAIN_START = (1 << 16);
+
+    bool IsAuxpow() const
+    {
+        return nVersion & VERSION_AUXPOW;
+    }
+
+    bool IsLegacy() const
+    {
+        return nVersion == 1;
+    }
+
+    int GetChainId() const
+    {
+        return nVersion >> 16;
+    }
+
+    void SetAuxpowVersion(bool auxpow)
+    {
+        if (auxpow)
+            nVersion |= VERSION_AUXPOW;
+        else
+            nVersion &= ~VERSION_AUXPOW;
+    }
+
+    void SetChainId(int chainId)
+    {
+        nVersion = (nVersion & 0xFFFF) | (chainId << 16);
+    }
+
+    int32_t GetBaseVersion() const
+    {
+        return nVersion % VERSION_AUXPOW;
+    }
+
+    template<typename Stream>
+    void Serialize(Stream& s) const {
+        // Serialize the 80-byte header
+        s << nVersion << hashPrevBlock << hashMerkleRoot << nTime << nBits << nNonce;
+
+        // For AuxPoW blocks, also serialize the AuxPoW data
+        // This matches the original Junkcoin Core behavior
+        if (IsAuxpow()) {
+            if (auxpow) {
+                s << *auxpow;
+            }
+        }
+    }
+
+    template<typename Stream>
+    void Unserialize(Stream& s) {
+        // Deserialize the 80-byte header
+        s >> nVersion >> hashPrevBlock >> hashMerkleRoot >> nTime >> nBits >> nNonce;
+
+        // For AuxPoW blocks, also deserialize the AuxPoW data
+        if (IsAuxpow()) {
+            auxpow = std::make_shared<CAuxPow>();
+            s >> *auxpow;
+        } else {
+            auxpow.reset();
+        }
+    }
 
     void SetNull()
     {
@@ -44,6 +112,7 @@ public:
         nTime = 0;
         nBits = 0;
         nNonce = 0;
+        auxpow.reset();
     }
 
     bool IsNull() const
@@ -112,6 +181,7 @@ public:
         block.nTime          = nTime;
         block.nBits          = nBits;
         block.nNonce         = nNonce;
+        block.auxpow         = auxpow;
         return block;
     }
 
@@ -151,5 +221,8 @@ struct CBlockLocator
         return vHave.empty();
     }
 };
+
+// Include auxpow.h at the end to provide complete type for template instantiation
+#include <auxpow.h>
 
 #endif // BITCOIN_PRIMITIVES_BLOCK_H

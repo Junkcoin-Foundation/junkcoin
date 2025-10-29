@@ -26,6 +26,7 @@
 #include <interfaces/chain.h>
 #include <interfaces/node.h>
 #include <key.h>
+#include <key_io.h>
 #include <miner.h>
 #include <net.h>
 #include <net_permissions.h>
@@ -110,7 +111,7 @@ static const char* DEFAULT_ASMAP_FILENAME="ip_asn.map";
 /**
  * The PID file facilities.
  */
-static const char* BITCOIN_PID_FILENAME = "litecoind.pid";
+static const char* BITCOIN_PID_FILENAME = "junkcoind.pid";
 
 static fs::path GetPidFile(const ArgsManager& args)
 {
@@ -568,6 +569,7 @@ void SetupServerArgs(NodeContext& node)
 
     argsman.AddArg("-blockmaxweight=<n>", strprintf("Set maximum BIP141 block weight (default: %d)", DEFAULT_BLOCK_MAX_WEIGHT), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockmintxfee=<amt>", strprintf("Set lowest fee rate (in %s/kB) for transactions to be included in block creation. (default: %s)", CURRENCY_UNIT, FormatMoney(DEFAULT_BLOCK_MIN_TX_FEE)), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
+    argsman.AddArg("-mineraddress=<addr>", "Specify the address to use for the miner reward when external miners submit blocks with nonstandard outputs (only effective during development fund period)", ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockversion=<n>", "Override block version to test forking scenarios", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::BLOCK_CREATION);
 
     argsman.AddArg("-rest", strprintf("Accept public REST requests (default: %u)", DEFAULT_REST_ENABLE), ArgsManager::ALLOW_ANY, OptionsCategory::RPC);
@@ -598,7 +600,7 @@ void SetupServerArgs(NodeContext& node)
 
 std::string LicenseInfo()
 {
-    const std::string URL_SOURCE_CODE = "<https://github.com/litecoin-project/litecoin>";
+    const std::string URL_SOURCE_CODE = "<https://github.com/junkcoin-project/junkcoin>";
 
     return CopyrightHolders(strprintf(_("Copyright (C) %i-%i").translated, 2011, COPYRIGHT_YEAR) + " ") + "\n" +
            "\n" +
@@ -1323,9 +1325,9 @@ bool AppInitMain(const util::Ref& context, NodeContext& node, interfaces::BlockA
     // Warn about relative -datadir path.
     if (args.IsArgSet("-datadir") && !fs::path(args.GetArg("-datadir", "")).is_absolute()) {
         LogPrintf("Warning: relative datadir option '%s' specified, which will be interpreted relative to the " /* Continued */
-                  "current working directory '%s'. This is fragile, because if litecoin is started in the future "
+                  "current working directory '%s'. This is fragile, because if junkcoin is started in the future "
                   "from a different location, it will be unable to locate the current data files. There could "
-                  "also be data loss if litecoin is started while in a temporary directory.\n",
+                  "also be data loss if junkcoin is started while in a temporary directory.\n",
                   args.GetArg("-datadir", ""), fs::current_path().string());
     }
 
@@ -1552,6 +1554,25 @@ bool AppInitMain(const util::Ref& context, NodeContext& node, interfaces::BlockA
 
     if (args.IsArgSet("-maxuploadtarget")) {
         nMaxOutboundLimit = args.GetArg("-maxuploadtarget", DEFAULT_MAX_UPLOAD_TARGET) * 1024 * 1024;
+    }
+
+    // Validate miner address if specified
+    std::string strMinerAddress = args.GetArg("-mineraddress", "");
+    if (!strMinerAddress.empty()) {
+        CTxDestination dest = DecodeDestination(strMinerAddress);
+        if (!IsValidDestination(dest)) {
+            return InitError(strprintf(Untranslated(
+                "Invalid address for -mineraddress=<addr>: '%s'. Must be a valid Junkcoin address."),
+                strMinerAddress));
+        }
+        // Add a warning that -mineraddress only applies within development fund block range
+        LogPrintf("Warning: -mineraddress is only effective for blocks within the development fund range (blocks %d to %d).\n",
+                 chainparams.GetDevelopmentFundStartHeight() + 1, chainparams.GetLastDevelopmentFundBlockHeight());
+        // Cache the validated script for reuse
+        CScript minerScript = GetScriptForDestination(dest);
+        if (minerScript.empty()) {
+            return InitError(Untranslated("Failed to create script for miner address"));
+        }
     }
 
     // ********************************************************* Step 7: load block chain

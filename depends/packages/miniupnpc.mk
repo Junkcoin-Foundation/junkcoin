@@ -1,8 +1,8 @@
 package=miniupnpc
-$(package)_version=2.2.2
+$(package)_version=2.2.7
 $(package)_download_path=https://miniupnp.tuxfamily.org/files/
 $(package)_file_name=$(package)-$($(package)_version).tar.gz
-$(package)_sha256_hash=888fb0976ba61518276fe1eda988589c700a3f2a69d71089260d75562afd3687
+$(package)_sha256_hash=b0c3a27056840fd0ec9328a5a9bac3dc5e0ec6d2e8733349cf577b0aa1e70ac1
 $(package)_patches=dont_leak_info.patch
 
 define $(package)_set_vars

@@ -51,6 +51,7 @@
 #include <util/translation.h>
 #include <validationinterface.h>
 #include <warnings.h>
+#include <junkcoin.h>
 
 #include <string>
 
@@ -640,7 +641,7 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
                 // insecure.
                 bool fReplacementOptOut = true;
 
-                // Litecoin: Only support BIP125 RBF when -mempoolreplacement arg is set
+                // Junkcoin: Only support BIP125 RBF when -mempoolreplacement arg is set
                 if (gArgs.GetArg("-mempoolreplacement", DEFAULT_ENABLE_REPLACEMENT)) {
                     for (const CTxIn &_txin : ptxConflicting->vin)
                     {
@@ -1189,8 +1190,8 @@ bool ReadBlockFromDisk(CBlock& block, const FlatFilePos& pos, const Consensus::P
         return error("%s: Deserialize or I/O error - %s at %s", __func__, e.what(), pos.ToString());
     }
 
-    // Check the header
-    if (!CheckProofOfWork(block.GetPoWHash(), block.nBits, consensusParams))
+    // Check the header (use AuxPoW-aware validation)
+    if (!CheckAuxPowProofOfWork(block, consensusParams))
         return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
 
     // Signet only: check block solution
@@ -1265,15 +1266,8 @@ bool ReadRawBlockFromDisk(std::vector<uint8_t>& block, const CBlockIndex* pindex
 
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
 {
-    int halvings = nHeight / consensusParams.nSubsidyHalvingInterval;
-    // Force block reward to zero when right shift is undefined.
-    if (halvings >= 64)
-        return 0;
-
-    CAmount nSubsidy = 50 * COIN;
-    // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
-    nSubsidy >>= halvings;
-    return nSubsidy;
+    // Use Junkcoin's custom block subsidy calculation
+    return GetJunkcoinBlockSubsidy(nHeight, 0, consensusParams, uint256());
 }
 
 CoinsViews::CoinsViews(
@@ -2267,6 +2261,31 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
     if (block.vtx[0]->GetValueOut() > blockReward) {
         LogPrintf("ERROR: ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)\n", block.vtx[0]->GetValueOut(), blockReward);
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-cb-amount");
+    }
+
+    // Check if block is within development fund range
+    bool isDevFundActive = (pindex->nHeight > chainparams.GetDevelopmentFundStartHeight()) && 
+                           (pindex->nHeight <= chainparams.GetLastDevelopmentFundBlockHeight());
+
+    // Enforce Development Fund: 20% of base block reward (excluding fees) - only active in specific block range
+    if (isDevFundActive) {
+        bool found = false;
+        CAmount baseReward = GetJunkcoinBlockSubsidy(pindex->nHeight, 0, chainparams.GetConsensus(), block.hashPrevBlock);
+        CAmount expectedDevFund = baseReward * chainparams.GetDevelopmentFundPercent(); // 20% of base reward only
+        
+        for (const CTxOut& output : block.vtx[0]->vout) {
+            if (output.scriptPubKey == chainparams.GetDevelopmentFundScriptAtHeight(pindex->nHeight)) {
+                if (output.nValue == expectedDevFund) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        
+        if (!found) {
+            LogPrintf("ERROR: ConnectBlock(): development fund output missing or incorrect at height %d\n", pindex->nHeight);
+            return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-dev-fund");
+        }
     }
 
     if (!control.Wait()) {
@@ -3464,8 +3483,8 @@ static bool FindUndoPos(BlockValidationState &state, int nFile, FlatFilePos &pos
 
 static bool CheckBlockHeader(const CBlockHeader& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW = true)
 {
-    // Check proof of work matches claimed amount
-    if (fCheckPOW && !CheckProofOfWork(block.GetPoWHash(), block.nBits, consensusParams))
+    // Check proof of work matches claimed amount (use AuxPoW-aware validation)
+    if (fCheckPOW && !CheckAuxPowProofOfWork(block, consensusParams))
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "high-hash", "proof of work failed");
 
     return true;
@@ -3633,7 +3652,8 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     const int nHeight = pindexPrev->nHeight + 1;
 
     // Check proof of work
-    const Consensus::Params& consensusParams = params.GetConsensus();
+    // Junkcoin: Use height-based consensus for correct rules at this height
+    const Consensus::Params& consensusParams = params.GetConsensus(nHeight);
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-diffbits", "incorrect proof of work");
 
@@ -3657,17 +3677,25 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     if (block.GetBlockTime() > nAdjustedTime + MAX_FUTURE_BLOCK_TIME)
         return state.Invalid(BlockValidationResult::BLOCK_TIME_FUTURE, "time-too-new", "block timestamp too far in the future");
 
+    // Junkcoin: Auxpow activation is OPTIONAL, not mandatory
+    // Blocks before height 173004: version 0x20200004 (auxpow bit NOT set)
+    // Blocks from height 173004+: version 0x20200104 (auxpow bit set)
+    // However, auxpow is optional - some blocks may not use it even after activation
+    // Therefore we DON'T enforce auxpow flag requirement
+
     // Reject outdated version blocks when 95% (75% on testnet) of the network has upgraded:
     // check for version 2, 3 and 4 upgrades
-    if((block.nVersion < 2 && nHeight >= consensusParams.BIP34Height) ||
-       (block.nVersion < 3 && nHeight >= consensusParams.BIP66Height) ||
-       (block.nVersion < 4 && nHeight >= consensusParams.BIP65Height))
+    // Junkcoin: Use base version for auxpow blocks (strip auxpow flag and chain ID)
+    const int32_t nBaseVersion = block.GetBaseVersion();
+    if((nBaseVersion < 2 && nHeight >= consensusParams.BIP34Height) ||
+       (nBaseVersion < 3 && nHeight >= consensusParams.BIP66Height) ||
+       (nBaseVersion < 4 && nHeight >= consensusParams.BIP65Height))
             return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, strprintf("bad-version(0x%08x)", block.nVersion),
-                                 strprintf("rejected nVersion=0x%08x block", block.nVersion));
+                                 strprintf("rejected nVersion=0x%08x block (base version %d)", block.nVersion, nBaseVersion));
 
-    if (block.nVersion < VERSIONBITS_TOP_BITS && IsWitnessEnabled(pindexPrev, consensusParams))
+    if (nBaseVersion < VERSIONBITS_TOP_BITS && IsWitnessEnabled(pindexPrev, consensusParams))
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, strprintf("bad-version(0x%08x)", block.nVersion),
-                                 strprintf("rejected nVersion=0x%08x block", block.nVersion));
+                                 strprintf("rejected nVersion=0x%08x block (base version %d)", block.nVersion, nBaseVersion));
 
     return true;
 }
@@ -3709,6 +3737,30 @@ static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& stat
             return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-cb-height", "block height mismatch in coinbase");
         }
     }
+
+    // Check if block is within development fund range
+    const CChainParams& chainParams = Params();
+    bool isDevFundActive = (nHeight > chainParams.GetDevelopmentFundStartHeight()) &&
+                           (nHeight <= chainParams.GetLastDevelopmentFundBlockHeight());
+
+    // Enforce Development Fund: 20% of base block reward (excluding fees) - only active in specific block range
+    if (isDevFundActive) {
+        bool found = false;
+        CAmount baseReward = GetBlockSubsidy(nHeight, consensusParams);
+        CAmount expectedDevFund = baseReward * chainParams.GetDevelopmentFundPercent(); // 20% of base reward only
+
+        for (const CTxOut& output : block.vtx[0]->vout) {
+            if (output.scriptPubKey == chainParams.GetDevelopmentFundScriptAtHeight(nHeight)) {
+                if (output.nValue == expectedDevFund) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found) {
+            return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "cb-no-development-fund", "development fund missing");
+        }
+    } // Outside this range, don't enforce development fund (pre-development fund behavior)
 
     // Validation for witness commitments.
     // * We compute the witness hash (which is the hash including witnesses) of all the block's transactions, except the

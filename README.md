@@ -21,6 +21,26 @@ software which enables the use of this currency.
 For more information, as well as an immediately useable, binary version of
 the Junkcoin Core software, see [https://junk-coin.com](https://junk-coin.com).
 
+History
+-------
+
+Junkcoin was originally forked from Litecoin in its early development. Over time,
+the codebase diverged as Junkcoin implemented its own features and modifications.
+In 2025, the project underwent a significant migration to return to its Litecoin
+lineage while preserving all Junkcoin-specific features and improvements.
+
+This migration involved:
+- Returning to the clean Litecoin codebase as the foundation
+- Merging all Junkcoin-specific modifications (AuxPoW, custom fee structures, branding)
+- Updating dependencies for modern compatibility
+- Establishing a clean foundation for future Junkcoin development
+
+By returning to the Litecoin lineage, Junkcoin benefits from:
+- Better compatibility with Litecoin ecosystem tools and libraries
+- Easier integration of upstream Litecoin improvements and security fixes
+- A well-tested and battle-hardened codebase foundation
+- Clear separation between core Litecoin functionality and Junkcoin innovations
+
 License
 -------
 

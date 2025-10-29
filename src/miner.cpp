@@ -174,8 +174,25 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     coinbaseTx.vin[0].prevout.SetNull();
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = scriptPubKeyIn;
-    coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
+
+    // Use base reward without fees for development fund calculation
+    CAmount baseReward = GetBlockSubsidy(nHeight, chainparams.GetConsensus());
+    coinbaseTx.vout[0].nValue = baseReward;
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
+
+    // Check if block is within development fund range
+    bool isDevFundActive = (nHeight > chainparams.GetDevelopmentFundStartHeight()) &&
+                           (nHeight <= chainparams.GetLastDevelopmentFundBlockHeight());
+
+    // Development Fund: 20% of base block reward (excluding fees) - only active in specific block range
+    if (isDevFundActive) {
+        CAmount nDevelopmentFund = baseReward * chainparams.GetDevelopmentFundPercent(); // 20% of base reward only
+        coinbaseTx.vout[0].nValue -= nDevelopmentFund; // Subtract from miner reward
+        coinbaseTx.vout.push_back(CTxOut(nDevelopmentFund, chainparams.GetDevelopmentFundScriptAtHeight(nHeight))); // Add output for Development Fund
+    } // Outside this range, default to pre-development fund behavior (miner gets full block reward)
+
+    // Add fees to miner after development fund is deducted
+    coinbaseTx.vout[0].nValue += nFees; // Fees are always given to miner
     pblock->vtx[0] = MakeTransactionRef(std::move(coinbaseTx));
     pblocktemplate->vchCoinbaseCommitment = GenerateCoinbaseCommitment(*pblock, pindexPrev, chainparams.GetConsensus());
     pblocktemplate->vTxFees[0] = -nFees;

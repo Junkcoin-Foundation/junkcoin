@@ -47,7 +47,8 @@ bool CheckTransaction(const CTransaction& tx, TxValidationState& state)
 
     if (tx.IsCoinBase())
     {
-        if (tx.vin[0].scriptSig.size() < 2 || tx.vin[0].scriptSig.size() > 100)
+        // Junkcoin: Genesis block has 102 byte coinbase, so allow up to 110 bytes
+        if (tx.vin[0].scriptSig.size() < 2 || tx.vin[0].scriptSig.size() > 110)
             return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-cb-length");
     }
     else

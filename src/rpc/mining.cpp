@@ -213,7 +213,7 @@ static RPCHelpMan generatetodescriptor()
         "\nMine blocks immediately to a specified descriptor (before the RPC call returns)\n",
         {
             {"num_blocks", RPCArg::Type::NUM, RPCArg::Optional::NO, "How many blocks are generated immediately."},
-            {"descriptor", RPCArg::Type::STR, RPCArg::Optional::NO, "The descriptor to send the newly generated litecoin to."},
+            {"descriptor", RPCArg::Type::STR, RPCArg::Optional::NO, "The descriptor to send the newly generated junkcoin to."},
             {"maxtries", RPCArg::Type::NUM, /* default */ ToString(DEFAULT_MAX_TRIES), "How many iterations to try."},
         },
         RPCResult{
@@ -261,7 +261,7 @@ static RPCHelpMan generatetoaddress()
                 "\nMine blocks immediately to a specified address (before the RPC call returns)\n",
                 {
                     {"nblocks", RPCArg::Type::NUM, RPCArg::Optional::NO, "How many blocks are generated immediately."},
-                    {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The address to send the newly generated litecoin to."},
+                    {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The address to send the newly generated junkcoin to."},
                     {"maxtries", RPCArg::Type::NUM, /* default */ ToString(DEFAULT_MAX_TRIES), "How many iterations to try."},
                 },
                 RPCResult{
@@ -272,7 +272,7 @@ static RPCHelpMan generatetoaddress()
                 RPCExamples{
             "\nGenerate 11 blocks to myaddress\n"
             + HelpExampleCli("generatetoaddress", "11 \"myaddress\"")
-            + "If you are using the " PACKAGE_NAME " wallet, you can get a new address to send the newly generated litecoin to with:\n"
+            + "If you are using the " PACKAGE_NAME " wallet, you can get a new address to send the newly generated junkcoin to with:\n"
             + HelpExampleCli("getnewaddress", "")
                 },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
@@ -300,7 +300,7 @@ static RPCHelpMan generateblock()
     return RPCHelpMan{"generateblock",
         "\nMine a block with a set of ordered transactions immediately to a specified address or descriptor (before the RPC call returns)\n",
         {
-            {"output", RPCArg::Type::STR, RPCArg::Optional::NO, "The address or descriptor to send the newly generated litecoin to."},
+            {"output", RPCArg::Type::STR, RPCArg::Optional::NO, "The address or descriptor to send the newly generated junkcoin to."},
             {"transactions", RPCArg::Type::ARR, RPCArg::Optional::NO, "An array of hex strings which are either txids or raw transactions.\n"
                 "Txids must reference transactions currently in the mempool.\n"
                 "All transactions must be valid and in valid order, otherwise the block will be rejected.",
@@ -768,9 +768,16 @@ static RPCHelpMan getblocktemplate()
     // NOTE: If at some point we support pre-segwit miners post-segwit-activation, this needs to take segwit support into consideration
     const bool fPreSegWit = (pindexPrev->nHeight + 1 < consensusParams.SegwitHeight);
 
+    // Check if block is within development fund range
+    const CChainParams& chainparams = Params();
+    int nHeight = pindexPrev->nHeight + 1;
+    bool isDevFundActive = (nHeight > chainparams.GetDevelopmentFundStartHeight()) &&
+                           (nHeight <= chainparams.GetLastDevelopmentFundBlockHeight());
+
     UniValue aCaps(UniValue::VARR); aCaps.push_back("proposal");
 
     UniValue transactions(UniValue::VARR);
+    UniValue txCoinbase(UniValue::VNULL);
     std::map<uint256, int64_t> setTxIndex;
     int i = 0;
     for (const auto& it : pblock->vtx) {
@@ -778,8 +785,31 @@ static RPCHelpMan getblocktemplate()
         uint256 txHash = tx.GetHash();
         setTxIndex[txHash] = i++;
 
-        if (tx.IsCoinBase())
+        if (tx.IsCoinBase()) {
+            // Get block height to check if we're in development fund active range
+            if (isDevFundActive && tx.vout.size() > 1) {
+                UniValue entry(UniValue::VOBJ);
+                // Development fund is always the second output in coinbase
+                entry.pushKV("developmentfund", (int64_t)tx.vout[1].nValue);
+
+                // Add development fund address to gbt
+                const CScript& scriptPublicKey = tx.vout[1].scriptPubKey;
+                std::vector<CTxDestination> addresses;
+                TxoutType whichType;
+                int nRequired;
+
+                ExtractDestinations(scriptPublicKey, whichType, addresses, nRequired);
+                UniValue o(UniValue::VARR);
+                for (const CTxDestination& addr : addresses) {
+                    o.push_back(EncodeDestination(addr));
+                }
+                entry.pushKV("developmentfundaddress", o);
+                entry.pushKV("required", true);
+                txCoinbase = entry;
+            }
+            // If not in active block range, no development fund info is included in the template
             continue;
+        }
 
         UniValue entry(UniValue::VOBJ);
 
@@ -879,6 +909,9 @@ static RPCHelpMan getblocktemplate()
 
     result.pushKV("previousblockhash", pblock->hashPrevBlock.GetHex());
     result.pushKV("transactions", transactions);
+    if (!txCoinbase.isNull()) {
+        result.pushKV("coinbasetxn", txCoinbase);
+    }
     result.pushKV("coinbaseaux", aux);
     result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue);
     result.pushKV("longpollid", ::ChainActive().Tip()->GetBlockHash().GetHex() + ToString(nTransactionsUpdatedLast));
@@ -1223,6 +1256,48 @@ static RPCHelpMan estimaterawfee()
     };
 }
 
+static RPCHelpMan getblocksubsidy()
+{
+    return RPCHelpMan{"getblocksubsidy",
+                "\nReturns block subsidy reward, taking into account the mining slow start and the development fund (20% of base reward), of block at index provided.\n",
+                {
+                    {"height", RPCArg::Type::NUM, /* default */ "current height", "The block height"},
+                },
+                RPCResult{
+                    RPCResult::Type::OBJ, "", "",
+                    {
+                        {RPCResult::Type::STR_AMOUNT, "miner", "The mining reward amount in " + CURRENCY_UNIT},
+                        {RPCResult::Type::STR_AMOUNT, "developmentfund", "The development fund amount (20% of base reward) in " + CURRENCY_UNIT},
+                    }
+                },
+                RPCExamples{
+                    HelpExampleCli("getblocksubsidy", "1000")
+            + HelpExampleRpc("getblocksubsidy", "1000")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    LOCK(cs_main);
+    const CChainParams& chainparams = Params();
+
+    int nHeight = request.params[0].isNull() ? ::ChainActive().Height() : request.params[0].get_int();
+    if (nHeight < 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
+
+    CAmount nReward = GetBlockSubsidy(nHeight, chainparams.GetConsensus());
+    CAmount nDevelopmentFund = 0;
+    if ((nHeight > chainparams.GetDevelopmentFundStartHeight()) && (nHeight <= chainparams.GetLastDevelopmentFundBlockHeight())) {
+        nDevelopmentFund = nReward * chainparams.GetDevelopmentFundPercent(); // 20% of base reward
+        nReward -= nDevelopmentFund;
+    }
+
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("miner", ValueFromAmount(nReward));
+    result.pushKV("developmentfund", ValueFromAmount(nDevelopmentFund));
+    return result;
+},
+    };
+}
+
 void RegisterMiningRPCCommands(CRPCTable &t)
 {
 // clang-format off
@@ -1235,6 +1310,7 @@ static const CRPCCommand commands[] =
     { "mining",             "getblocktemplate",       &getblocktemplate,       {"template_request"} },
     { "mining",             "submitblock",            &submitblock,            {"hexdata","dummy"} },
     { "mining",             "submitheader",           &submitheader,           {"hexdata"} },
+    { "mining",             "getblocksubsidy",        &getblocksubsidy,        {"height"} },
 
 
     { "generating",         "generatetoaddress",      &generatetoaddress,      {"nblocks","address","maxtries"} },
