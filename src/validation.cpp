@@ -3683,19 +3683,25 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     // However, auxpow is optional - some blocks may not use it even after activation
     // Therefore we DON'T enforce auxpow flag requirement
 
-    // Reject outdated version blocks when 95% (75% on testnet) of the network has upgraded:
-    // check for version 2, 3 and 4 upgrades
-    // Junkcoin: Use base version for auxpow blocks (strip auxpow flag and chain ID)
+    const bool usesVersionBits = ((block.nVersion & VERSIONBITS_TOP_MASK) == VERSIONBITS_TOP_BITS);
     const int32_t nBaseVersion = block.GetBaseVersion();
-    if((nBaseVersion < 2 && nHeight >= consensusParams.BIP34Height) ||
-       (nBaseVersion < 3 && nHeight >= consensusParams.BIP66Height) ||
-       (nBaseVersion < 4 && nHeight >= consensusParams.BIP65Height))
+
+    if (!usesVersionBits) {
+        // Reject outdated version blocks when 95% (75% on testnet) of the network has upgraded:
+        // check for version 2, 3 and 4 upgrades
+        // Junkcoin: Use base version for auxpow blocks (strip auxpow flag and chain ID)
+        if ((nBaseVersion < 2 && nHeight >= consensusParams.BIP34Height) ||
+            (nBaseVersion < 3 && nHeight >= consensusParams.BIP66Height) ||
+            (nBaseVersion < 4 && nHeight >= consensusParams.BIP65Height)) {
             return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, strprintf("bad-version(0x%08x)", block.nVersion),
                                  strprintf("rejected nVersion=0x%08x block (base version %d)", block.nVersion, nBaseVersion));
+        }
+    }
 
-    if (nBaseVersion < VERSIONBITS_TOP_BITS && IsWitnessEnabled(pindexPrev, consensusParams))
+    if (!usesVersionBits && IsWitnessEnabled(pindexPrev, consensusParams)) {
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, strprintf("bad-version(0x%08x)", block.nVersion),
-                                 strprintf("rejected nVersion=0x%08x block (base version %d)", block.nVersion, nBaseVersion));
+                             strprintf("rejected nVersion=0x%08x block (base version %d)", block.nVersion, nBaseVersion));
+    }
 
     return true;
 }

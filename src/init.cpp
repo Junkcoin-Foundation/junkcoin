@@ -600,7 +600,7 @@ void SetupServerArgs(NodeContext& node)
 
 std::string LicenseInfo()
 {
-    const std::string URL_SOURCE_CODE = "<https://github.com/junkcoin-project/junkcoin>";
+    const std::string URL_SOURCE_CODE = "<https://github.com/Junkcoin-Foundation/junkcoin>";
 
     return CopyrightHolders(strprintf(_("Copyright (C) %i-%i").translated, 2011, COPYRIGHT_YEAR) + " ") + "\n" +
            "\n" +

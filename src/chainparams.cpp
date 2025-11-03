@@ -74,9 +74,9 @@ public:
         consensus.BIP34Hash = uint256S("0xa2effa738145e377e08a61d76179c21703e13e48910b30a2a87f0dfe794b64c6"); // genesis
         consensus.BIP65Height = 0x210c; // 8460
         consensus.BIP66Height = 0x210c; // 8460
-        consensus.CSVHeight = 700000; // Force activation at block 700000 (BIP9 voting won't work due to merge mining)
+        consensus.CSVHeight = 1000000; // Force activation at block 700000 (BIP9 voting won't work due to merge mining)
         // Junkcoin: SegWit scheduled for activation at block 700000
-        consensus.SegwitHeight = 700000; // Activate at block 700000
+        consensus.SegwitHeight = 1000000; // Activate at block 700000
         consensus.MinBIP9WarningHeight = 10080 + 10080; // miner confirmation window
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 24 * 60 * 60; // 1 day
@@ -91,13 +91,13 @@ public:
 
         // Junkcoin: Taproot scheduled for future (not in original Junkcoin)
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 2;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = 800000; // Future activation
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = 1000000; // Far future timeout
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = 1100000; // Future activation
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = 1200000; // Far future timeout
 
         // Junkcoin: MWEB scheduled for far future (Litecoin-specific feature)
         consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].bit = 4;
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = 900000; // Far future
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = 1100000; // Far future timeout
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = 1300000; // Far future
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = 1400000; // Far future timeout
 
         consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000");
         consensus.defaultAssumeValid = uint256S("0xa2effa738145e377e08a61d76179c21703e13e48910b30a2a87f0dfe794b64c6"); // genesis

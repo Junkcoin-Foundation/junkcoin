@@ -678,6 +678,20 @@ static RPCHelpMan getblocktemplate()
             throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, PACKAGE_NAME " is in initial sync and waiting for blocks...");
     }
 
+    const CBlockIndex* pindexTip = ::ChainActive().Tip();
+    const int nextHeight = pindexTip ? pindexTip->nHeight + 1 : 0;
+    const Consensus::Params& consensus_params = Params().GetConsensus();
+    const bool requireSegwitRule = nextHeight >= consensus_params.SegwitHeight;
+    const ThresholdState mwebState = VersionBitsState(pindexTip, consensus_params, Consensus::DEPLOYMENT_MWEB, versionbitscache);
+    const bool requireMwebRule = mwebState == ThresholdState::ACTIVE;
+
+    if (requireSegwitRule && setClientRules.count("segwit") != 1) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "getblocktemplate must be called with the segwit rule set once segwit is active");
+    }
+    if (requireMwebRule && setClientRules.count("mweb") != 1) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "getblocktemplate must be called with the mweb rule set once MWEB is active");
+    }
+
     static unsigned int nTransactionsUpdatedLast;
     const CTxMemPool& mempool = EnsureMemPool(request.context);
 
@@ -729,9 +743,9 @@ static RPCHelpMan getblocktemplate()
     }
 
     // GBT must be called with 'segwit' and 'mweb' sets in the rules
-    if (setClientRules.count("segwit") != 1 || setClientRules.count("mweb") != 1) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "getblocktemplate must be called with the segwit & mweb rule sets (call with {\"rules\": [\"mweb\", \"segwit\"]})");
-    }
+    //if (setClientRules.count("segwit") != 1 || setClientRules.count("mweb") != 1) {
+    //    throw JSONRPCError(RPC_INVALID_PARAMETER, "getblocktemplate must be called with the segwit & mweb rule sets (call with {\"rules\": [\"mweb\", \"segwit\"]})");
+    //}
 
     // Update block
     static CBlockIndex* pindexPrev;
@@ -759,7 +773,7 @@ static RPCHelpMan getblocktemplate()
     }
     CHECK_NONFATAL(pindexPrev);
     CBlock* pblock = &pblocktemplate->block; // pointer for convenience
-    const Consensus::Params& consensusParams = Params().GetConsensus();
+    const Consensus::Params& consensusParams = consensus_params;
 
     // Update nTime
     UpdateTime(pblock, consensusParams, pindexPrev);
