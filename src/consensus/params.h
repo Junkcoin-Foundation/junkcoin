@@ -14,6 +14,11 @@ namespace Consensus {
 enum DeploymentPos
 {
     DEPLOYMENT_TESTDUMMY,
+    DEPLOYMENT_BIP34,
+    DEPLOYMENT_BIP66,
+    DEPLOYMENT_BIP65,
+    DEPLOYMENT_CSV,
+    DEPLOYMENT_SEGWIT,
     DEPLOYMENT_TAPROOT, // Deployment of Schnorr/Taproot (BIPs 340-342)
     DEPLOYMENT_MWEB, // Deployment of MWEB (LIPs 0002-0004)
     // NOTE: Also add new deployments to VersionBitsDeploymentInfo in versionbits.cpp

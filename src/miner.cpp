@@ -126,6 +126,13 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     nHeight = pindexPrev->nHeight + 1;
 
     pblock->nVersion = ComputeBlockVersion(pindexPrev, chainparams.GetConsensus());
+
+    // Junkcoin: Ensure auxpow-compatible header (chain ID + base version 4)
+    const Consensus::Params& consensus = chainparams.GetConsensus();
+    pblock->SetChainId(consensus.nAuxpowChainId);
+    if ((pblock->nVersion & 0xFF) < 4) {
+        pblock->nVersion = (pblock->nVersion & ~0xFF) | 4;
+    }
     // -regtest only: allow overriding block.nVersion with
     // -blockversion=N to test forking scenarios
     if (chainparams.MineBlocksOnDemand())

@@ -74,9 +74,9 @@ public:
         consensus.BIP34Hash = uint256S("0xa2effa738145e377e08a61d76179c21703e13e48910b30a2a87f0dfe794b64c6"); // genesis
         consensus.BIP65Height = 0x210c; // 8460
         consensus.BIP66Height = 0x210c; // 8460
-        consensus.CSVHeight = 1000000; // Force activation at block 700000 (BIP9 voting won't work due to merge mining)
-        // Junkcoin: SegWit scheduled for activation at block 700000
-        consensus.SegwitHeight = 1000000; // Activate at block 700000
+        consensus.CSVHeight = 1000000;
+        // Junkcoin: SegWit scheduled for activation at block 1,000,000
+        consensus.SegwitHeight = 1000000;
         consensus.MinBIP9WarningHeight = 10080 + 10080; // miner confirmation window
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 24 * 60 * 60; // 1 day
@@ -89,15 +89,35 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
 
-        // Junkcoin: Taproot scheduled for future (not in original Junkcoin)
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 2;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = 1100000; // Future activation
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = 1200000; // Far future timeout
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].bit = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].nStartTime = 1534490155;   // 2023-12-25 00:00:00 UTC
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].nTimeout = 1764490155;    // 2025-12-25 18:00:00 UTC
 
-        // Junkcoin: MWEB scheduled for far future (Litecoin-specific feature)
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].bit = 4;
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = 1300000; // Far future
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = 1400000; // Far future timeout
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].bit = 1;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].nStartTime = 1534490155;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].nTimeout = 1764490155;
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].bit = 2;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].nStartTime = 1534490155;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].nTimeout = 1764490155;
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 3;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1724732207;     // 2024-09-26 05:16:47 UTC
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1764490155;      // 2025-12-25 18:00:00 UTC
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].bit = 4;
+        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartTime = 1724732207;
+        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeout = 1764490155;
+
+        // Junkcoin: Taproot scheduled for height-based activation
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 6;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = 1100000;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = 1200000;
+
+        // Junkcoin: MWEB activation window
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].bit = 7;
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = 1200000;
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = 1300000;
 
         consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000");
         consensus.defaultAssumeValid = uint256S("0xa2effa738145e377e08a61d76179c21703e13e48910b30a2a87f0dfe794b64c6"); // genesis
@@ -241,9 +261,9 @@ public:
         consensus.BIP34Hash = uint256S("8075c771ed8b495ffd943980a95f702ab34fce3c8c54e379548bda33cc8c0573");
         consensus.BIP65Height = 76; // 8075c771ed8b495ffd943980a95f702ab34fce3c8c54e379548bda33cc8c0573
         consensus.BIP66Height = 76; // 8075c771ed8b495ffd943980a95f702ab34fce3c8c54e379548bda33cc8c0573
-        consensus.CSVHeight = 6048; // 00000000025e930139bac5c6c31a403776da130831ab85be56578f3fa75369bb
-        consensus.SegwitHeight = 6048; // 00000000002b980fcd729daaa248fd9316a5200e9b367f4ff2c42453e84201ca
-        consensus.MinBIP9WarningHeight = 8064; // segwit activation height + miner confirmation window
+        consensus.CSVHeight = 110000;
+        consensus.SegwitHeight = 110000;
+        consensus.MinBIP9WarningHeight = 111440;
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 24 * 60 * 60; // Junkcoin: 1 day (not Litecoin's 3.5 days)
         consensus.nPowTargetSpacing = 60; // Junkcoin: 1 minute (not Litecoin's 2.5 minutes)
@@ -255,15 +275,35 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
 
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].bit = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].bit = 1;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].bit = 2;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 3;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].bit = 4;
+        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+
         // Deployment of Taproot (BIPs 340-342)
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 2;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = 2225664; // March 2022
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = 2435328; // 364 days later
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 6;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = 150000;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = 170000;
 
         // Deployment of MWEB (LIP-0002, LIP-0003, and LIP-0004)
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].bit = 4;
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = 2209536; // Jan/Feb 2022
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = 2419200; // 364 days later
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].bit = 7;
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = 170000;
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = 190000;
 
         consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000000004260a1758f04aa");
         consensus.defaultAssumeValid = uint256S("0x4a280c0e150e3b74ebe19618e6394548c8a39d5549fd9941b9c431c73822fbd5"); // 1737876
@@ -318,11 +358,20 @@ public:
         };
 
         chainTxData = ChainTxData{
-            // Data from RPC: getchaintxstats 4096 36d8ad003bac090cf7bf4e24fbe1d319554c8933b9314188d6096ac12648764d
-            /* nTime    */ 1607986972,
-            /* nTxCount */ 4229067,
-            /* dTxRate  */ 0.06527021772939347,
+            /* nTime    */ 1729728000,
+            /* nTxCount */ 0,
+            /* dTxRate  */ 0,
         };
+
+        // Development Fund mirrors mainnet addresses but activates earlier for testing
+        vDevelopmentFundAddress = {
+            "3P3UvT6vdDJVrbB2mn6WrP8gywpu2Knx8C",
+            "34cGTrxRD4VvfbDri6RhQDKPBokfLTNJse",
+            "37NpTG2p6gjVeZDmAiPLKNs6Nhj5EfTR55"
+        };
+        vDevelopmentFundStartHeight = 110000;
+        vDevelopmentFundLastHeight = 3547800;
+        vDevelopmentFundPercent = 0.2;
     }
 };
 
@@ -337,12 +386,12 @@ public:
         consensus.signet_challenge.clear();
         consensus.nSubsidyHalvingInterval = 150;
         consensus.BIP16Height = 0;
-        consensus.BIP34Height = 500; // BIP34 activated on regtest (Used in functional tests)
+        consensus.BIP34Height = 100;
         consensus.BIP34Hash = uint256();
-        consensus.BIP65Height = 1351; // BIP65 activated on regtest (Used in functional tests)
-        consensus.BIP66Height = 1251; // BIP66 activated on regtest (Used in functional tests)
-        consensus.CSVHeight = 432; // CSV activated on regtest (Used in rpc activation tests)
-        consensus.SegwitHeight = 0; // SEGWIT is always activated on regtest unless overridden
+        consensus.BIP65Height = 150;
+        consensus.BIP66Height = 140;
+        consensus.CSVHeight = 200;
+        consensus.SegwitHeight = 200;
         consensus.MinBIP9WarningHeight = 0;
         consensus.powLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 3.5 * 24 * 60 * 60; // 3.5 days
@@ -356,14 +405,34 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
 
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 2;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].bit = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].bit = 1;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].bit = 2;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 3;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].bit = 4;
+        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 6;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = 300;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = 400;
 
         // Deployment of MWEB (LIP-0002 and LIP-0003)
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].bit = 4;
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartTime = 1601450001; // September 30, 2020
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].bit = 7;
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = 350;
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = 450;
 
         consensus.nMinimumChainWork = uint256{};
         consensus.defaultAssumeValid = uint256{};
