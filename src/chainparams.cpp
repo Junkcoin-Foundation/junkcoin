@@ -74,9 +74,9 @@ public:
         consensus.BIP34Hash = uint256S("0xa2effa738145e377e08a61d76179c21703e13e48910b30a2a87f0dfe794b64c6"); // genesis
         consensus.BIP65Height = 0x210c; // 8460
         consensus.BIP66Height = 0x210c; // 8460
-        consensus.CSVHeight = 1000000;
-        // Junkcoin: SegWit scheduled for activation at block 1,000,000
-        consensus.SegwitHeight = 1000000;
+        consensus.CSVHeight = std::numeric_limits<int>::max(); // Disabled
+        // Junkcoin: SegWit disabled
+        consensus.SegwitHeight = std::numeric_limits<int>::max();
         consensus.MinBIP9WarningHeight = 10080 + 10080; // miner confirmation window
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 24 * 60 * 60; // 1 day
@@ -86,8 +86,8 @@ public:
         consensus.nRuleChangeActivationThreshold = 9576; // 95% of 10,080
         consensus.nMinerConfirmationWindow = 10080; // 60 * 24 * 7 = 10,080 blocks, or one week
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
 
         consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].bit = 0;
         consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].nStartTime = 1534490155;   // 2023-12-25 00:00:00 UTC
@@ -109,15 +109,15 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartTime = 1724732207;
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeout = 1764490155;
 
-        // Junkcoin: Taproot scheduled for height-based activation
+        // Junkcoin: Taproot disabled
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 6;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = 1100000;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = 1200000;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = std::numeric_limits<int>::max();
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = std::numeric_limits<int>::max();
 
-        // Junkcoin: MWEB activation window
+        // Junkcoin: MWEB disabled
         consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].bit = 7;
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = 1200000;
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = 1300000;
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = std::numeric_limits<int>::max();
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = std::numeric_limits<int>::max();
 
         consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000");
         consensus.defaultAssumeValid = uint256S("0xa2effa738145e377e08a61d76179c21703e13e48910b30a2a87f0dfe794b64c6"); // genesis
@@ -158,9 +158,11 @@ public:
         // NOTE: Junkcoin DNS seeds use old format (no service bit filtering)
         // Litecoin's DNS mechanism will try x1.hostname first, then fallback to AddAddrFetch(hostname)
         // This provides backward compatibility with old DNS seed servers
-        vSeeds.emplace_back("mainnet.junk-coin.com");
-        vSeeds.emplace_back("junk-seed.s3na.xyz");
-        vSeeds.emplace_back("jkc-seed.junkiewally.xyz");
+        // DNS seeds disabled - using hardcoded IPs instead
+        // vSeeds.emplace_back("mainnet.junk-coin.com");
+        // vSeeds.emplace_back("junk-seed.s3na.xyz");
+        // vSeeds.emplace_back("jkc-seed.junkiewally.xyz");
+        vSeeds.clear();
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,16);  // Legacy addresses start with '7'
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);   // Script addresses start with '3'
@@ -172,8 +174,8 @@ public:
         bech32_hrp = "jc";
         mweb_hrp = "jcmweb";
 
-        // Fixed seeds disabled - array is empty
-        vFixedSeeds.clear();
+        // Fixed seeds - hardcoded IPs from DNS seeds
+        vFixedSeeds = std::vector<uint8_t>(std::begin(chainparams_seed_main), std::end(chainparams_seed_main));
 
         fDefaultConsistencyChecks = false;
         fRequireStandard = true;
@@ -257,53 +259,58 @@ public:
         consensus.signet_challenge.clear();
         consensus.nSubsidyHalvingInterval = 100000; // Junkcoin (not Litecoin's 840000)
         consensus.BIP16Height = 0; // always enforce P2SH BIP16 on testnet
-        consensus.BIP34Height = 76;
-        consensus.BIP34Hash = uint256S("8075c771ed8b495ffd943980a95f702ab34fce3c8c54e379548bda33cc8c0573");
-        consensus.BIP65Height = 76; // 8075c771ed8b495ffd943980a95f702ab34fce3c8c54e379548bda33cc8c0573
-        consensus.BIP66Height = 76; // 8075c771ed8b495ffd943980a95f702ab34fce3c8c54e379548bda33cc8c0573
-        consensus.CSVHeight = 110000;
-        consensus.SegwitHeight = 110000;
+        // After deployments are activated we can change it
+        consensus.BIP34Hash = uint256S("0x00"); // unused for now.
+        consensus.BIP65Height = 99999999;
+        consensus.BIP66Height = 99999999;
+        consensus.CSVHeight = std::numeric_limits<int>::max(); // Disabled
+        consensus.SegwitHeight = std::numeric_limits<int>::max(); // Disabled
         consensus.MinBIP9WarningHeight = 111440;
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        consensus.nPowTargetTimespan = 24 * 60 * 60; // Junkcoin: 1 day (not Litecoin's 3.5 days)
-        consensus.nPowTargetSpacing = 60; // Junkcoin: 1 minute (not Litecoin's 2.5 minutes)
+        consensus.nPowTargetTimespan = 4 * 60 * 60; // 4H - match junkcoin-core
+        consensus.nPowTargetSpacing = 60; // Junkcoin: 1 minute
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
-        consensus.nRuleChangeActivationThreshold = 1080; // 75% of 1440 (Junkcoin testnet)
-        consensus.nMinerConfirmationWindow = 1440; // 24 * 60 = 1440 blocks (1 day at 1 minute spacing)
+        consensus.nRuleChangeActivationThreshold = 9576; // 95% of 10,080 - match junkcoin-core
+        consensus.nMinerConfirmationWindow = 10080; // 60 * 24 * 7 = 10,080 blocks - match junkcoin-core
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
+
+        // AuxPoW parameters
+        consensus.nAuxpowChainId = 0x2021; // Match junkcoin-core testnet
+        consensus.fStrictChainId = true;
+        consensus.nAuxpowStartHeight = 0;
 
         consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].bit = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].nStartTime = 1703462400;   // 2023-12-25 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].nTimeout   = 1735084800;   // 2024-12-25 00:00:00
 
         consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].bit = 1;
-        consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].nStartTime = 1703462400;   // 2023-12-25 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP66].nTimeout   = 1735084800;   // 2024-12-25 18:00:00
 
         consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].bit = 2;
-        consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].nStartTime = 1703462400;   // 2023-12-25 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP65].nTimeout   = 1735084800;   // 2024-12-25 18:00:00
 
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 3;
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1703462400; // 2023-12-25 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1735084800;   // 2024-12-25 18:00:00
 
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].bit = 4;
-        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartTime = 1703462400; // 2023-12-25 00:00:00
+        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeout = 1735084800;   // 2024-12-25 18:00:00
 
-        // Deployment of Taproot (BIPs 340-342)
+        // Taproot disabled
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 6;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = 150000;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = 170000;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = std::numeric_limits<int>::max();
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = std::numeric_limits<int>::max();
 
-        // Deployment of MWEB (LIP-0002, LIP-0003, and LIP-0004)
+        // MWEB disabled
         consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].bit = 7;
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = 170000;
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = 190000;
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = std::numeric_limits<int>::max();
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = std::numeric_limits<int>::max();
 
         consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000000004260a1758f04aa");
         consensus.defaultAssumeValid = uint256S("0x4a280c0e150e3b74ebe19618e6394548c8a39d5549fd9941b9c431c73822fbd5"); // 1737876
@@ -327,9 +334,10 @@ public:
         vFixedSeeds.clear();
         vSeeds.clear();
         // nodes with support for servicebits filtering should be at the top
-        vSeeds.emplace_back("testnet-seed.junkcointools.com");
-        vSeeds.emplace_back("seed-b.junkcoin.loshan.co.uk");
-        vSeeds.emplace_back("dnsseed-testnet.thrasher.io");
+        // DNS seeds disabled - these domains don't exist for Junkcoin testnet
+        // vSeeds.emplace_back("testnet-seed.junkcointools.com");
+        // vSeeds.emplace_back("seed-b.junkcoin.loshan.co.uk");
+        // vSeeds.emplace_back("dnsseed-testnet.thrasher.io");
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
@@ -338,8 +346,8 @@ public:
         base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
 
-        bech32_hrp = "tltc";
-        mweb_hrp = "tmweb";
+        bech32_hrp = "tjc";
+        mweb_hrp = "tjcmweb";
 
         // Empty testnet seeds - use DNS seeds or -addnode
         vFixedSeeds.clear();
@@ -363,15 +371,34 @@ public:
             /* dTxRate  */ 0,
         };
 
-        // Development Fund mirrors mainnet addresses but activates earlier for testing
+        // Development Fund - match junkcoin-core testnet
         vDevelopmentFundAddress = {
-            "3P3UvT6vdDJVrbB2mn6WrP8gywpu2Knx8C",
-            "34cGTrxRD4VvfbDri6RhQDKPBokfLTNJse",
-            "37NpTG2p6gjVeZDmAiPLKNs6Nhj5EfTR55"
+            "3PM5bKKhggNFzYjLnLsbUF7XHNSuA4bSVY",
+            "39Ak9GuMHfpWL3VoTm9NigyELzPC5toiE4",
+            "35tfGskRDxU3tWU3n5n2uvCqeHmGDKorVN"
         };
-        vDevelopmentFundStartHeight = 110000;
+        vDevelopmentFundStartHeight = 90650;
         vDevelopmentFundLastHeight = 3547800;
         vDevelopmentFundPercent = 0.2;
+
+        // Junkcoin: Setup consensus tree for height-based consensus rules
+        digishieldConsensus = consensus;
+        digishieldConsensus.nHeightEffective = 0xFFFFFFFF; // Never activated on testnet
+        digishieldConsensus.fSimplifiedRewards = true;
+        digishieldConsensus.fDigishieldDifficultyCalculation = true;
+        digishieldConsensus.nPowTargetTimespan = 60; // 1 minute timespan when enabled
+
+        minDifficultyConsensus = digishieldConsensus;
+        minDifficultyConsensus.nHeightEffective = std::numeric_limits<uint32_t>::max();
+        minDifficultyConsensus.fPowAllowDigishieldMinDifficultyBlocks = true;
+        minDifficultyConsensus.fPowAllowMinDifficultyBlocks = false;
+
+        auxpowConsensus = digishieldConsensus;
+        auxpowConsensus.nHeightEffective = std::numeric_limits<uint32_t>::max();
+
+        pConsensusRoot = &digishieldConsensus;
+        digishieldConsensus.pLeft = &consensus;
+        digishieldConsensus.pRight = &auxpowConsensus;
     }
 };
 
@@ -386,24 +413,29 @@ public:
         consensus.signet_challenge.clear();
         consensus.nSubsidyHalvingInterval = 150;
         consensus.BIP16Height = 0;
-        consensus.BIP34Height = 100;
+        consensus.BIP34Height = 2;
         consensus.BIP34Hash = uint256();
-        consensus.BIP65Height = 150;
-        consensus.BIP66Height = 140;
-        consensus.CSVHeight = 200;
-        consensus.SegwitHeight = 200;
+        consensus.BIP65Height = 3;
+        consensus.BIP66Height = 4;
+        consensus.CSVHeight = 5;
+        consensus.SegwitHeight = 6;
         consensus.MinBIP9WarningHeight = 0;
-        consensus.powLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-        consensus.nPowTargetTimespan = 3.5 * 24 * 60 * 60; // 3.5 days
-        consensus.nPowTargetSpacing = 2.5 * 60;
+        consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        consensus.nPowTargetTimespan = 4 * 60 * 60; // 4 hours - match junkcoin-core
+        consensus.nPowTargetSpacing = 60; // Junkcoin: 1 minute block target
         consensus.fPowAllowMinDifficultyBlocks = true;
-        consensus.fPowNoRetargeting = true;
-        consensus.nRuleChangeActivationThreshold = 108; // 75% for testchains
-        consensus.nMinerConfirmationWindow = 144; // Faster than normal for regtest (144 instead of 2016)
+        consensus.fPowNoRetargeting = false;
+        consensus.nRuleChangeActivationThreshold = 9576; // 95% of 10,080 - match junkcoin-core
+        consensus.nMinerConfirmationWindow = 10080; // 60 * 24 * 7 = 10,080 blocks - match junkcoin-core
 
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+
+        // AuxPoW parameters
+        consensus.nAuxpowChainId = 0x2021; // Match junkcoin-core
+        consensus.fStrictChainId = true;
+        consensus.nAuxpowStartHeight = 0;
 
         consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].bit = 0;
         consensus.vDeployments[Consensus::DEPLOYMENT_BIP34].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
@@ -425,14 +457,15 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
 
+        // Taproot disabled
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 6;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = 300;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = 400;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = std::numeric_limits<int>::max();
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = std::numeric_limits<int>::max();
 
-        // Deployment of MWEB (LIP-0002 and LIP-0003)
+        // MWEB disabled
         consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].bit = 7;
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = 350;
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = 450;
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = std::numeric_limits<int>::max();
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = std::numeric_limits<int>::max();
 
         consensus.nMinimumChainWork = uint256{};
         consensus.defaultAssumeValid = uint256{};
@@ -441,7 +474,7 @@ public:
         pchMessageStart[1] = 0xbf;
         pchMessageStart[2] = 0xb5;
         pchMessageStart[3] = 0xda;
-        nDefaultPort = 19444;
+        nDefaultPort = 19771;
         nPruneAfterHeight = 1000;
         m_assumed_blockchain_size = 0;
         m_assumed_chain_state_size = 0;
@@ -473,15 +506,42 @@ public:
             0
         };
 
-        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
-        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
+        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,47);  // Regtest specific - match junkcoin-core
+        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);   // Script addresses - match junkcoin-core
         base58Prefixes[SCRIPT_ADDRESS2] = std::vector<unsigned char>(1,58);
-        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,239);
+        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,153); // Regtest specific - match junkcoin-core
         base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
 
-        bech32_hrp = "rltc";
-        mweb_hrp = "tmweb";
+        bech32_hrp = "rjc";
+        mweb_hrp = "rjcmweb";
+
+        // Development Fund - match junkcoin-core regtest
+        vDevelopmentFundAddress = {
+            "3PSpnu5Fdt34u2EEdHZjfaogcVCMC72h24"
+        };
+        vDevelopmentFundStartHeight = 1;
+        vDevelopmentFundLastHeight = 150;
+        vDevelopmentFundPercent = 0.2;
+
+        // Junkcoin: Setup consensus tree for height-based consensus rules
+        digishieldConsensus = consensus;
+        digishieldConsensus.nHeightEffective = 0xFFFFFFFF; // Never activated on regtest
+        digishieldConsensus.fSimplifiedRewards = true;
+        digishieldConsensus.fDigishieldDifficultyCalculation = true;
+        digishieldConsensus.nPowTargetTimespan = 60; // 1 minute placeholder
+
+        minDifficultyConsensus = digishieldConsensus;
+        minDifficultyConsensus.nHeightEffective = std::numeric_limits<uint32_t>::max();
+        minDifficultyConsensus.fPowAllowDigishieldMinDifficultyBlocks = true;
+        minDifficultyConsensus.fPowAllowMinDifficultyBlocks = false;
+
+        auxpowConsensus = digishieldConsensus;
+        auxpowConsensus.nHeightEffective = std::numeric_limits<uint32_t>::max();
+
+        pConsensusRoot = &digishieldConsensus;
+        digishieldConsensus.pLeft = &consensus;
+        digishieldConsensus.pRight = &auxpowConsensus;
     }
 
     /**
