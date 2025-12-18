@@ -158,11 +158,9 @@ public:
         // NOTE: Junkcoin DNS seeds use old format (no service bit filtering)
         // Litecoin's DNS mechanism will try x1.hostname first, then fallback to AddAddrFetch(hostname)
         // This provides backward compatibility with old DNS seed servers
-        // DNS seeds disabled - using hardcoded IPs instead
-        // vSeeds.emplace_back("mainnet.junk-coin.com");
-        // vSeeds.emplace_back("junk-seed.s3na.xyz");
-        // vSeeds.emplace_back("jkc-seed.junkiewally.xyz");
-        vSeeds.clear();
+        vSeeds.emplace_back("mainnet.junk-coin.com");
+        vSeeds.emplace_back("junk-seed.s3na.xyz");
+        vSeeds.emplace_back("jkc-seed.junkiewally.xyz");
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,16);  // Legacy addresses start with '7'
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);   // Script addresses start with '3'
@@ -321,7 +319,7 @@ public:
         pchMessageStart[2] = 0xb7;
         pchMessageStart[3] = 0xdc;
         nDefaultPort = 19771;
-        nPruneAfterHeight = 1000;
+        nPruneAfterHeight = 100000;
         m_assumed_blockchain_size = 4;
         m_assumed_chain_state_size = 1;
 
@@ -334,17 +332,15 @@ public:
         vFixedSeeds.clear();
         vSeeds.clear();
         // nodes with support for servicebits filtering should be at the top
-        // DNS seeds disabled - these domains don't exist for Junkcoin testnet
-        // vSeeds.emplace_back("testnet-seed.junkcointools.com");
-        // vSeeds.emplace_back("seed-b.junkcoin.loshan.co.uk");
-        // vSeeds.emplace_back("dnsseed-testnet.thrasher.io");
+        vSeeds.emplace_back("testnet.junk-coin.com");
+        vSeeds.emplace_back("junk-testnet.s3na.xyz");
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
-        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
+        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);   // Match junkcoin-core
         base58Prefixes[SCRIPT_ADDRESS2] = std::vector<unsigned char>(1,58);
         base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,239);
-        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
-        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
+        base58Prefixes[EXT_PUBLIC_KEY] = {0x02, 0xfa, 0xca, 0xfd};  // Match junkcoin-core
+        base58Prefixes[EXT_SECRET_KEY] = {0x02, 0xfa, 0xc3, 0x98};  // Match junkcoin-core
 
         bech32_hrp = "tjc";
         mweb_hrp = "tjcmweb";
@@ -411,7 +407,7 @@ public:
         strNetworkID =  CBaseChainParams::REGTEST;
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
-        consensus.nSubsidyHalvingInterval = 150;
+        consensus.nSubsidyHalvingInterval = 100000; // Match junkcoin-core
         consensus.BIP16Height = 0;
         consensus.BIP34Height = 2;
         consensus.BIP34Hash = uint256();
@@ -470,12 +466,12 @@ public:
         consensus.nMinimumChainWork = uint256{};
         consensus.defaultAssumeValid = uint256{};
 
-        pchMessageStart[0] = 0xfa;
-        pchMessageStart[1] = 0xbf;
-        pchMessageStart[2] = 0xb5;
-        pchMessageStart[3] = 0xda;
+        pchMessageStart[0] = 0xfc;  // Match junkcoin-core
+        pchMessageStart[1] = 0xc1;
+        pchMessageStart[2] = 0xb7;
+        pchMessageStart[3] = 0xdc;
         nDefaultPort = 19771;
-        nPruneAfterHeight = 1000;
+        nPruneAfterHeight = 100000; // Match junkcoin-core
         m_assumed_blockchain_size = 0;
         m_assumed_chain_state_size = 0;
 
@@ -510,8 +506,8 @@ public:
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);   // Script addresses - match junkcoin-core
         base58Prefixes[SCRIPT_ADDRESS2] = std::vector<unsigned char>(1,58);
         base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,153); // Regtest specific - match junkcoin-core
-        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
-        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
+        base58Prefixes[EXT_PUBLIC_KEY] = {0x02, 0xfa, 0xca, 0xfd};  // Match junkcoin-core
+        base58Prefixes[EXT_SECRET_KEY] = {0x02, 0xfa, 0xc3, 0x98};  // Match junkcoin-core
 
         bech32_hrp = "rjc";
         mweb_hrp = "rjcmweb";

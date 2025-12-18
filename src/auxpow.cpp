@@ -71,8 +71,7 @@ int CMerkleTx::GetBlocksToMaturity() const
 {
     if (!IsCoinBase())
         return 0;
-    // v0.21: Use COINBASE_MATURITY constant (100 blocks)
-    const int COINBASE_MATURITY = 100;
+    // Use COINBASE_MATURITY from consensus/consensus.h (70 blocks for Junkcoin)
     return std::max(0, (COINBASE_MATURITY + 1) - GetDepthInMainChain());
 }
 

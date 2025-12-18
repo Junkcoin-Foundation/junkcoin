@@ -3597,7 +3597,9 @@ std::vector<unsigned char> GenerateCoinbaseCommitment(CBlock& block, const CBloc
     std::vector<unsigned char> commitment;
     int commitpos = GetWitnessCommitmentIndex(block);
     std::vector<unsigned char> ret(32, 0x00);
-    if (consensusParams.SegwitHeight != std::numeric_limits<int>::max()) {
+    // Junkcoin: Only generate witness commitment when SegWit is actually active
+    // This ensures compatibility: blocks before SegwitHeight won't have commitment
+    if (IsWitnessEnabled(pindexPrev, consensusParams)) {
         if (commitpos == NO_WITNESS_COMMITMENT) {
             uint256 witnessroot = BlockWitnessMerkleRoot(block, nullptr);
             CHash256().Write(witnessroot).Write(ret).Finalize(witnessroot);
