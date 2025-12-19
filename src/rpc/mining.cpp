@@ -766,6 +766,7 @@ static RPCHelpMan getblocktemplate()
 
         // Check if current block is within development fund active range
         int nHeight = pindexPrevNew->nHeight + 1;
+        const CChainParams& chainparams = Params();
         bool isDevFundActive = (nHeight > chainparams.GetDevelopmentFundStartHeight()) && 
                                (nHeight <= chainparams.GetLastDevelopmentFundBlockHeight());
 
@@ -1387,7 +1388,7 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey, const CTxMemPo
 
             // Finalise it by setting the version and building the merkle root
             IncrementExtraNonce(&newBlock->block, pindexPrev, nExtraNonce);
-            newBlock->block.SetAuxpowFlag(true);
+            newBlock->block.SetAuxpowVersion(true);
 
             // Save
             pblock = &newBlock->block;
@@ -1414,7 +1415,7 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey, const CTxMemPo
     result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue);
     result.pushKV("bits", strprintf("%08x", pblock->nBits));
     result.pushKV("height", static_cast<int64_t>(pindexPrev->nHeight + 1));
-    result.pushKV("target", HexStr(target));
+    result.pushKV("target", ArithToUint256(target).GetHex());
 
     return result;
 }
@@ -1436,11 +1437,12 @@ static bool AuxMiningSubmitBlock(const std::string& hashHex, const std::string& 
     CDataStream ss(vchAuxPow, SER_GETHASH, PROTOCOL_VERSION);
     CAuxPow pow;
     ss >> pow;
-    block.SetAuxpow(new CAuxPow(pow));
+    block.auxpow = std::make_shared<CAuxPow>(pow);
+    block.SetAuxpowVersion(true);
     assert(block.GetHash() == hash);
 
     std::shared_ptr<const CBlock> shared_block = std::make_shared<const CBlock>(block);
-    bool fAccepted = ProcessNewBlock(Params(), shared_block, true, nullptr);
+    bool fAccepted = g_chainman.ProcessNewBlock(Params(), shared_block, true, nullptr);
 
     return fAccepted;
 }

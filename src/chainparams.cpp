@@ -77,6 +77,10 @@ public:
         consensus.CSVHeight = std::numeric_limits<int>::max(); // Disabled
         // Junkcoin: SegWit disabled
         consensus.SegwitHeight = std::numeric_limits<int>::max();
+        // Junkcoin: Taproot disabled
+        consensus.TaprootHeight = std::numeric_limits<int>::max();
+        // Junkcoin: MWEB disabled
+        consensus.MWEBHeight = std::numeric_limits<int>::max();
         consensus.MinBIP9WarningHeight = 10080 + 10080; // miner confirmation window
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 24 * 60 * 60; // 1 day
@@ -149,18 +153,8 @@ public:
         assert(consensus.hashGenesisBlock == uint256S("0xa2effa738145e377e08a61d76179c21703e13e48910b30a2a87f0dfe794b64c6"));
         assert(genesis.hashMerkleRoot == uint256S("0x3de124b0274307911fe12550e96bf76cb92c12835db6cb19f82658b8aca1dbc8"));
 
-        // Note that of those which support the service bits prefix, most only support a subset of
-        // possible options.
-        // This is fine at runtime as we'll fall back to using them as an addrfetch if they don't support the
-        // service bits we want, but we should get them updated to support all service bits wanted by any
-        // release ASAP to avoid it where possible.
-        // 
-        // NOTE: Junkcoin DNS seeds use old format (no service bit filtering)
-        // Litecoin's DNS mechanism will try x1.hostname first, then fallback to AddAddrFetch(hostname)
-        // This provides backward compatibility with old DNS seed servers
-        vSeeds.emplace_back("mainnet.junk-coin.com");
-        vSeeds.emplace_back("junk-seed.s3na.xyz");
-        vSeeds.emplace_back("jkc-seed.junkiewally.xyz");
+        // DNS seeds disabled - using only fixed seeds from chainparamsseeds.h
+        vSeeds.clear();
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,16);  // Legacy addresses start with '7'
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);   // Script addresses start with '3'
@@ -261,8 +255,10 @@ public:
         consensus.BIP34Hash = uint256S("0x00"); // unused for now.
         consensus.BIP65Height = 99999999;
         consensus.BIP66Height = 99999999;
-        consensus.CSVHeight = std::numeric_limits<int>::max(); // Disabled
-        consensus.SegwitHeight = std::numeric_limits<int>::max(); // Disabled
+        consensus.CSVHeight = 100000;      // Activated at block 100000
+        consensus.SegwitHeight = 101000;   // Activated at block 101000
+        consensus.TaprootHeight = 102000;  // Activated at block 102000
+        consensus.MWEBHeight = 103000;     // Activated at block 103000
         consensus.MinBIP9WarningHeight = 111440;
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 4 * 60 * 60; // 4H - match junkcoin-core
@@ -331,9 +327,7 @@ public:
 
         vFixedSeeds.clear();
         vSeeds.clear();
-        // nodes with support for servicebits filtering should be at the top
-        vSeeds.emplace_back("testnet.junk-coin.com");
-        vSeeds.emplace_back("junk-testnet.s3na.xyz");
+        // DNS seeds disabled - using only fixed seeds from chainparamsseeds.h
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);   // Match junkcoin-core
@@ -345,8 +339,8 @@ public:
         bech32_hrp = "tjc";
         mweb_hrp = "tjcmweb";
 
-        // Empty testnet seeds - use DNS seeds or -addnode
-        vFixedSeeds.clear();
+        // Fixed seeds from chainparamsseeds.h
+        vFixedSeeds = std::vector<uint8_t>(std::begin(chainparams_seed_test), std::end(chainparams_seed_test));
 
         fDefaultConsistencyChecks = false;
         fRequireStandard = false;
@@ -411,16 +405,18 @@ public:
         consensus.BIP16Height = 0;
         consensus.BIP34Height = 2;
         consensus.BIP34Hash = uint256();
-        consensus.BIP65Height = 3;
-        consensus.BIP66Height = 4;
-        consensus.CSVHeight = 5;
-        consensus.SegwitHeight = 6;
+        consensus.BIP65Height = 2;
+        consensus.BIP66Height = 2;
+        consensus.CSVHeight = 40;     // Activated at block 40
+        consensus.SegwitHeight = 60;  // Activated at block 60
+        consensus.TaprootHeight = 80; // Activated at block 80 (no signaling required)
+        consensus.MWEBHeight = 100;   // Activated at block 100 (no signaling required)
         consensus.MinBIP9WarningHeight = 0;
-        consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        consensus.powLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");  // Easiest difficulty for regtest
         consensus.nPowTargetTimespan = 4 * 60 * 60; // 4 hours - match junkcoin-core
         consensus.nPowTargetSpacing = 60; // Junkcoin: 1 minute block target
         consensus.fPowAllowMinDifficultyBlocks = true;
-        consensus.fPowNoRetargeting = false;
+        consensus.fPowNoRetargeting = true;  // Regtest: no difficulty retargeting
         consensus.nRuleChangeActivationThreshold = 9576; // 95% of 10,080 - match junkcoin-core
         consensus.nMinerConfirmationWindow = 10080; // 60 * 24 * 7 = 10,080 blocks - match junkcoin-core
 
@@ -453,15 +449,15 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
 
-        // Taproot disabled
+        // Taproot activated at block 80
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 6;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = std::numeric_limits<int>::max();
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = std::numeric_limits<int>::max();
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = 80;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = 200;
 
-        // MWEB disabled
+        // MWEB activated at block 100
         consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].bit = 7;
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = std::numeric_limits<int>::max();
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = std::numeric_limits<int>::max();
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = 100;
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = 200;
 
         consensus.nMinimumChainWork = uint256{};
         consensus.defaultAssumeValid = uint256{};
@@ -477,13 +473,15 @@ public:
 
         UpdateActivationParametersFromArgs(args);
 
-        // Junkcoin regtest genesis
-        genesis = CreateGenesisBlock(1369199888, 12097647, 0x1e0ffff0, 1, 50 * COIN);
+        // Junkcoin regtest genesis - use easy nBits for instant mining
+        genesis = CreateGenesisBlock(1369199888, 0, 0x207fffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
         // Junkcoin: No assertion for regtest (allows flexible testing)
 
-        vFixedSeeds.clear(); //!< Regtest mode doesn't have any fixed seeds.
+        vFixedSeeds.clear();
         vSeeds.clear();      //!< Regtest mode doesn't have any DNS seeds.
+        // Fixed seeds from chainparamsseeds.h for regtest testing
+        vFixedSeeds = std::vector<uint8_t>(std::begin(chainparams_seed_regtest), std::end(chainparams_seed_regtest));
 
         fDefaultConsistencyChecks = true;
         fRequireStandard = true;
@@ -512,12 +510,12 @@ public:
         bech32_hrp = "rjc";
         mweb_hrp = "rjcmweb";
 
-        // Development Fund - match junkcoin-core regtest
+        // Development Fund - starts at block 20 for regtest
         vDevelopmentFundAddress = {
-            "3PSpnu5Fdt34u2EEdHZjfaogcVCMC72h24"
+            "QWfej6fiFs1Nt9AZb9qfzcZRikMrKmpZxp"
         };
-        vDevelopmentFundStartHeight = 1;
-        vDevelopmentFundLastHeight = 150;
+        vDevelopmentFundStartHeight = 20;   // Activated at block 20
+        vDevelopmentFundLastHeight = 200;   // Ends at block 200
         vDevelopmentFundPercent = 0.2;
 
         // Junkcoin: Setup consensus tree for height-based consensus rules

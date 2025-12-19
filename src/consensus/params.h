@@ -76,6 +76,12 @@ struct Params {
      * Note that segwit v0 script rules are enforced on all blocks except the
      * BIP 16 exception blocks. */
     int SegwitHeight;
+    /** Block height at which Taproot (BIP340, BIP341, BIP342) becomes active.
+     * Set to std::numeric_limits<int>::max() to disable. */
+    int TaprootHeight;
+    /** Block height at which MWEB becomes active.
+     * Set to std::numeric_limits<int>::max() to disable. */
+    int MWEBHeight;
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and segwit activations. */
     int MinBIP9WarningHeight;
