@@ -831,9 +831,16 @@ static RPCHelpMan getblocktemplate()
         setTxIndex[txHash] = i++;
 
         if (tx.IsCoinBase()) {
+            UniValue entry(UniValue::VOBJ);
+            
+            // Always include basic coinbase info
+            entry.pushKV("data", EncodeHexTx(tx));
+            entry.pushKV("txid", txHash.GetHex());
+            entry.pushKV("hash", tx.GetWitnessHash().GetHex());
+            entry.pushKV("required", true);
+            
             // Get block height to check if we're in development fund active range
             if (isDevFundActive && tx.vout.size() > 1) {
-                UniValue entry(UniValue::VOBJ);
                 // Development fund is always the second output in coinbase
                 entry.pushKV("developmentfund", (int64_t)tx.vout[1].nValue);
 
@@ -849,10 +856,9 @@ static RPCHelpMan getblocktemplate()
                     o.push_back(EncodeDestination(addr));
                 }
                 entry.pushKV("developmentfundaddress", o);
-                entry.pushKV("required", true);
-                txCoinbase = entry;
             }
-            // If not in active block range, no development fund info is included in the template
+            
+            txCoinbase = entry;
             continue;
         }
 

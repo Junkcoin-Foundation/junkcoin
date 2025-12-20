@@ -104,6 +104,9 @@ struct Params {
     uint256 nMinimumChainWork;
     /** By default assume that the signatures in ancestors of this block are valid */
     uint256 defaultAssumeValid;
+    
+    /** Junkcoin: Number of blocks that coinbase transactions must mature before they can be spent */
+    uint32_t nCoinbaseMaturity;
 
     /**
      * If true, witness commitments contain a payload equal to a Bitcoin Script solution

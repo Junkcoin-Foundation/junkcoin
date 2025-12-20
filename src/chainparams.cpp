@@ -125,6 +125,7 @@ public:
 
         consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000");
         consensus.defaultAssumeValid = uint256S("0xa2effa738145e377e08a61d76179c21703e13e48910b30a2a87f0dfe794b64c6"); // genesis
+        consensus.nCoinbaseMaturity = 70; // Junkcoin mainnet: 70 blocks
 
         // AuxPoW parameters
         consensus.nAuxpowChainId = 0x2020; // 8224 in decimal
@@ -257,7 +258,7 @@ public:
         consensus.BIP66Height = 99999999;
         consensus.CSVHeight = 100000;      // Activated at block 100000
         consensus.SegwitHeight = 101000;   // Activated at block 101000
-        consensus.TaprootHeight = 102000;  // Activated at block 102000
+        consensus.TaprootHeight = std::numeric_limits<int>::max();  // Disabled - Taproot not supported
         consensus.MWEBHeight = 103000;     // Activated at block 103000
         consensus.MinBIP9WarningHeight = 111440;
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
@@ -306,8 +307,9 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = std::numeric_limits<int>::max();
         consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = std::numeric_limits<int>::max();
 
-        consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000000004260a1758f04aa");
-        consensus.defaultAssumeValid = uint256S("0x4a280c0e150e3b74ebe19618e6394548c8a39d5549fd9941b9c431c73822fbd5"); // 1737876
+        consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000");
+        consensus.defaultAssumeValid = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000"); // Disabled for testing
+        consensus.nCoinbaseMaturity = 30; // Junkcoin testnet: 30 blocks (matches old core)
 
         // Junkcoin testnet magic bytes and port
         pchMessageStart[0] = 0xfc;
@@ -331,7 +333,7 @@ public:
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);   // Match junkcoin-core
-        base58Prefixes[SCRIPT_ADDRESS2] = std::vector<unsigned char>(1,58);
+        base58Prefixes[SCRIPT_ADDRESS2] = std::vector<unsigned char>(1,5);
         base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,239);
         base58Prefixes[EXT_PUBLIC_KEY] = {0x02, 0xfa, 0xca, 0xfd};  // Match junkcoin-core
         base58Prefixes[EXT_SECRET_KEY] = {0x02, 0xfa, 0xc3, 0x98};  // Match junkcoin-core
@@ -407,7 +409,7 @@ public:
         consensus.BIP66Height = 2;
         consensus.CSVHeight = 40;     // Activated at block 40
         consensus.SegwitHeight = 60;  // Activated at block 60
-        consensus.TaprootHeight = 80; // Activated at block 80 (no signaling required)
+        consensus.TaprootHeight = std::numeric_limits<int>::max(); // Disabled - Taproot not supported
         consensus.MWEBHeight = 100;   // Activated at block 100 (no signaling required)
         consensus.MinBIP9WarningHeight = 0;
         consensus.powLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");  // Easiest difficulty for regtest
@@ -459,6 +461,7 @@ public:
 
         consensus.nMinimumChainWork = uint256{};
         consensus.defaultAssumeValid = uint256{};
+        consensus.nCoinbaseMaturity = 30; // Junkcoin regtest: 30 blocks (matches old core)
 
         pchMessageStart[0] = 0xfc;  // Match junkcoin-core
         pchMessageStart[1] = 0xc1;
@@ -500,7 +503,7 @@ public:
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,47);  // Regtest specific - match junkcoin-core
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);   // Script addresses - match junkcoin-core
-        base58Prefixes[SCRIPT_ADDRESS2] = std::vector<unsigned char>(1,58);
+        base58Prefixes[SCRIPT_ADDRESS2] = std::vector<unsigned char>(1,5);
         base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,153); // Regtest specific - match junkcoin-core
         base58Prefixes[EXT_PUBLIC_KEY] = {0x02, 0xfa, 0xca, 0xfd};  // Match junkcoin-core
         base58Prefixes[EXT_SECRET_KEY] = {0x02, 0xfa, 0xc3, 0x98};  // Match junkcoin-core
@@ -640,7 +643,8 @@ std::string CChainParams::GetDevelopmentFundAddressAtHeight(int nHeight) const {
 CScript CChainParams::GetDevelopmentFundScriptAtHeight(int nHeight) const {
     assert(nHeight > 0 && nHeight <= GetLastDevelopmentFundBlockHeight());
 
-    CTxDestination dest = DecodeDestination(GetDevelopmentFundAddressAtHeight(nHeight));
+    // Use *this to decode with correct network params (not global Params())
+    CTxDestination dest = DecodeDestination(GetDevelopmentFundAddressAtHeight(nHeight), *this);
     assert(IsValidDestination(dest));
     
     // v0.21: CScriptID renamed to ScriptHash
