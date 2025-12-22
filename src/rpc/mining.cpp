@@ -1404,6 +1404,32 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey, const CTxMemPo
         }
     }
 
+    // Verify dev fund output is present if required
+    const CChainParams& chainparams = Params();
+    int blockHeight = pindexPrev->nHeight + 1;
+    bool isDevFundActive = (blockHeight > chainparams.GetDevelopmentFundStartHeight()) &&
+                           (blockHeight <= chainparams.GetLastDevelopmentFundBlockHeight());
+
+    LogPrintf("AuxMiningCreateBlock: height=%d, devFundActive=%d, coinbase vout.size=%d\n",
+              blockHeight, isDevFundActive, pblock->vtx[0]->vout.size());
+
+    if (isDevFundActive) {
+        if (pblock->vtx[0]->vout.size() < 2) {
+            LogPrintf("ERROR: AuxMiningCreateBlock: Dev fund required but coinbase has only %d outputs! Forcing block regeneration.\n",
+                      pblock->vtx[0]->vout.size());
+            // Force regeneration by clearing cache
+            mapNewBlock.clear();
+            vNewBlockTemplate.clear();
+            curBlocks.clear();
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Block generation failed: dev fund output missing. Please retry.");
+        }
+        // Verify dev fund amount is correct
+        CAmount baseReward = GetBlockSubsidy(blockHeight, chainparams.GetConsensus());
+        CAmount expectedDevFund = baseReward * chainparams.GetDevelopmentFundPercent();
+        LogPrintf("AuxMiningCreateBlock: Verifying dev fund: expected=%lld, actual vout[1]=%lld\n",
+                  expectedDevFund, pblock->vtx[0]->vout[1].nValue);
+    }
+
     // At this point, pblock is always initialised
     assert(pblock);
 

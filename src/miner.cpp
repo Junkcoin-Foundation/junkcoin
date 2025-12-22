@@ -191,11 +191,17 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     bool isDevFundActive = (nHeight > chainparams.GetDevelopmentFundStartHeight()) &&
                            (nHeight <= chainparams.GetLastDevelopmentFundBlockHeight());
 
+    LogPrintf("CreateNewBlock: height=%d, devFundStart=%d, devFundEnd=%d, isDevFundActive=%d, baseReward=%lld\\n",
+              nHeight, chainparams.GetDevelopmentFundStartHeight(), 
+              chainparams.GetLastDevelopmentFundBlockHeight(), isDevFundActive, baseReward);
+
     // Development Fund: 20% of base block reward (excluding fees) - only active in specific block range
     if (isDevFundActive) {
         CAmount nDevelopmentFund = baseReward * chainparams.GetDevelopmentFundPercent(); // 20% of base reward only
         coinbaseTx.vout[0].nValue -= nDevelopmentFund; // Subtract from miner reward
         coinbaseTx.vout.push_back(CTxOut(nDevelopmentFund, chainparams.GetDevelopmentFundScriptAtHeight(nHeight))); // Add output for Development Fund
+        LogPrintf("CreateNewBlock: Added dev fund output: amount=%lld, minerReward=%lld, totalOutputs=%d\\n",
+                  nDevelopmentFund, coinbaseTx.vout[0].nValue, coinbaseTx.vout.size());
     } // Outside this range, default to pre-development fund behavior (miner gets full block reward)
 
     // Add fees to miner after development fund is deducted
