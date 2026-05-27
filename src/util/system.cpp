@@ -1284,6 +1284,7 @@ std::string CopyrightHolders(const std::string& strPrefix)
     const auto copyright_devs = strprintf(_(COPYRIGHT_HOLDERS).translated, COPYRIGHT_HOLDERS_SUBSTITUTION);
     std::string strCopyrightHolders = strPrefix + copyright_devs;
 
+    // Credit upstream projects
     const std::string litecoinLine = strprintf(_("Copyright (C) %i-%i").translated, 2011, COPYRIGHT_YEAR) + " " + _("The Litecoin Core developers").translated;
     strCopyrightHolders += "\n" + litecoinLine;
 

@@ -50,7 +50,9 @@ public:
 
     bool IsLegacy() const
     {
-        return nVersion == 1;
+        return nVersion == 1
+            // junkcoin: We have a random v2 block with no AuxPoW, treat as legacy
+            || (nVersion == 2 && GetChainId() == 0);
     }
 
     int GetChainId() const
@@ -76,6 +78,28 @@ public:
         return nVersion % VERSION_AUXPOW;
     }
 
+    void SetBaseVersion(int32_t nBaseVersion, int32_t nChainId)
+    {
+        assert(nBaseVersion >= 1 && nBaseVersion < VERSION_AUXPOW);
+        nVersion = nBaseVersion | (nChainId * VERSION_CHAIN_START);
+    }
+
+    void SetAuxpowFlag(bool auxpow)
+    {
+        SetAuxpowVersion(auxpow);
+    }
+
+    void SetAuxpow(CAuxPow* apow)
+    {
+        if (apow) {
+            auxpow.reset(apow);
+            SetAuxpowVersion(true);
+        } else {
+            auxpow.reset();
+            SetAuxpowVersion(false);
+        }
+    }
+
     template<typename Stream>
     void Serialize(Stream& s) const {
         // Serialize the 80-byte header
@@ -84,9 +108,8 @@ public:
         // For AuxPoW blocks, also serialize the AuxPoW data
         // This matches the original Junkcoin Core behavior
         if (IsAuxpow()) {
-            if (auxpow) {
-                s << *auxpow;
-            }
+            assert(auxpow);
+            s << *auxpow;
         }
     }
 

@@ -41,9 +41,7 @@ void CMerkleTx::InitMerkleBranch(const CBlock& block, int posInBlock)
 {
     hashBlock = block.GetHash();
     nIndex = posInBlock;
-    // v0.21: BlockMerkleBranch removed, vMerkleBranch is deprecated
-    // For auxpow purposes, we just need the block hash which is already set
-    vMerkleBranch.clear();
+    vMerkleBranch = BlockMerkleBranch(block, nIndex);
 }
 
 int CMerkleTx::GetDepthInMainChain(const CBlockIndex* &pindexRet) const

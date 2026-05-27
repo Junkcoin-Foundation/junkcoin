@@ -12,10 +12,16 @@
 #include <uint256.h>
 #include <util/strencodings.h>
 #include <validation.h>
+#include <pow.h>
 
 #include <test/util/setup_common.h>
 
 #include <boost/test/unit_test.hpp>
+
+#define UBEGIN(a)           ((unsigned char*)&(a))
+#define UEND(a)             ((unsigned char*)&((&(a))[1]))
+
+static const CScript COINBASE_FLAGS;
 
 #include <algorithm>
 #include <vector>
@@ -155,7 +161,12 @@ CAuxpowBuilder::get(const CTransactionRef tx) const
 
     res.vChainMerkleBranch = auxpowChainMerkleBranch;
     res.nChainIndex = auxpowChainIndex;
-    res.parentBlock = parentBlock;
+    res.parentBlock.nVersion = parentBlock.nVersion;
+    res.parentBlock.hashPrevBlock = parentBlock.hashPrevBlock;
+    res.parentBlock.hashMerkleRoot = parentBlock.hashMerkleRoot;
+    res.parentBlock.nTime = parentBlock.nTime;
+    res.parentBlock.nBits = parentBlock.nBits;
+    res.parentBlock.nNonce = parentBlock.nNonce;
 
     return res;
 }
@@ -198,7 +209,7 @@ BOOST_AUTO_TEST_CASE(check_auxpow)
     index = CAuxPow::getExpectedIndex(nonce, ourChainId, height);
     auxRoot = builder.buildAuxpowChain(hashAux, height, index);
     data = CAuxpowBuilder::buildCoinbaseData(true, auxRoot, height, nonce);
-    scr = (CScript() << 2809 << 2013) + COINBASE_FLAGS;
+    scr = (CScript() << 2809 << 2013);
     scr = (scr << OP_2 << data);
     builder.setCoinbase(scr);
     BOOST_CHECK(builder.get().check(hashAux, ourChainId, params));
@@ -233,7 +244,7 @@ BOOST_AUTO_TEST_CASE(check_auxpow)
     index = CAuxPow::getExpectedIndex(nonce, ourChainId, height + 1);
     auxRoot = builder2.buildAuxpowChain(hashAux, height + 1, index);
     data = CAuxpowBuilder::buildCoinbaseData(true, auxRoot, height + 1, nonce);
-    scr = (CScript() << 2809 << 2013) + COINBASE_FLAGS;
+    scr = (CScript() << 2809 << 2013);
     scr = (scr << OP_2 << data);
     builder2.setCoinbase(scr);
     BOOST_CHECK(!builder2.get().check(hashAux, ourChainId, params));
@@ -249,7 +260,7 @@ BOOST_AUTO_TEST_CASE(check_auxpow)
     index = CAuxPow::getExpectedIndex(nonce, ourChainId, height);
     auxRoot = builder2.buildAuxpowChain(hashAux, height, index);
     data = CAuxpowBuilder::buildCoinbaseData(false, auxRoot, height, nonce);
-    scr = (CScript() << 2809 << 2013) + COINBASE_FLAGS;
+    scr = (CScript() << 2809 << 2013);
     scr = (scr << OP_2 << data);
     builder2.setCoinbase(scr);
     BOOST_CHECK(builder2.get().check(hashAux, ourChainId, params));

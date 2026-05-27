@@ -2,6 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <chainparams.h>
+#include <interfaces/node.h>
 #include <wallet/wallet.h>
 
 #include <qt/receivecoinsdialog.h>
@@ -93,11 +95,26 @@ void ReceiveCoinsDialog::setModel(WalletModel *_model)
         columnResizingFixer = new GUIUtil::TableViewLastColumnResizingFixer(tableView, AMOUNT_MINIMUM_COLUMN_WIDTH, DATE_COLUMN_WIDTH, this);
 
         // Setup address type combo box
+        // Junkcoin: Only show address types that are activated
+        const int currentHeight = _model->node().getNumBlocks();
+        const Consensus::Params& consensus = Params().GetConsensus();
+        
         ui->addressTypeCombo->addItem(tr("Default (Wallet Setting)"), -1);
         ui->addressTypeCombo->addItem(tr("Legacy (P2PKH)"), static_cast<int>(OutputType::LEGACY));
-        ui->addressTypeCombo->addItem(tr("SegWit (Bech32)"), static_cast<int>(OutputType::BECH32));
-        ui->addressTypeCombo->addItem(tr("Wrapped SegWit (P2SH)"), static_cast<int>(OutputType::P2SH_SEGWIT));
-        ui->addressTypeCombo->addItem(tr("MWEB (Privacy)"), static_cast<int>(OutputType::MWEB));
+        
+        // Only show SegWit options if activated
+        if (currentHeight >= consensus.SegwitHeight) {
+            ui->addressTypeCombo->addItem(tr("SegWit (Bech32)"), static_cast<int>(OutputType::BECH32));
+            ui->addressTypeCombo->addItem(tr("Wrapped SegWit (P2SH)"), static_cast<int>(OutputType::P2SH_SEGWIT));
+        }
+        
+        // Note: Taproot (BECH32M) not supported - OutputType doesn't have BECH32M
+        
+        // Only show MWEB option if activated
+        if (currentHeight >= consensus.MWEBHeight) {
+            ui->addressTypeCombo->addItem(tr("MWEB (Privacy)"), static_cast<int>(OutputType::MWEB));
+        }
+        
         ui->addressTypeCombo->setCurrentIndex(0); // Default to wallet setting
 
         // Set the button to be enabled or disabled based on whether the wallet can give out new addresses.

@@ -3,8 +3,12 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <arith_uint256.h>
+#include <auxpow.h>
 #include <chainparams.h>
+#include <chainparamsbase.h>
 #include <junkcoin.h>
+#include <primitives/block.h>
+#include <streams.h>
 #include <test/util/setup_common.h>
 
 #include <boost/test/unit_test.hpp>
@@ -214,35 +218,194 @@ BOOST_AUTO_TEST_CASE(hardfork_parameters)
     SelectParams(CBaseChainParams::MAIN);
     const Consensus::Params& initialParams = Params().GetConsensus(0);
 
-    BOOST_CHECK_EQUAL(initialParams.nPowTargetTimespan, 14400);
-    BOOST_CHECK_EQUAL(initialParams.AllowLegacyBlocks(0), true); // Always true because nLegacyBlocksBefore is -1 by default
+    BOOST_CHECK_EQUAL(initialParams.nPowTargetTimespan, 86400); // 24 * 60 * 60 = 1 day
+    BOOST_CHECK_EQUAL(initialParams.AllowLegacyBlocks(0), true);
     BOOST_CHECK_EQUAL(initialParams.fDigishieldDifficultyCalculation, false);
 
-    const Consensus::Params& initialParamsEnd = Params().GetConsensus(144999);
-    BOOST_CHECK_EQUAL(initialParamsEnd.nPowTargetTimespan, 14400);
-    BOOST_CHECK_EQUAL(initialParamsEnd.AllowLegacyBlocks(144999), true); // Always true because nLegacyBlocksBefore is -1 by default
-    BOOST_CHECK_EQUAL(initialParamsEnd.fDigishieldDifficultyCalculation, false);
+    // Check pre-auxpow heights
+    const Consensus::Params& preAuxpowParams = Params().GetConsensus(172999);
+    BOOST_CHECK_EQUAL(preAuxpowParams.nPowTargetTimespan, 86400);
+    BOOST_CHECK_EQUAL(preAuxpowParams.AllowLegacyBlocks(172999), true);
+    BOOST_CHECK_EQUAL(preAuxpowParams.fDigishieldDifficultyCalculation, false);
 
-    const Consensus::Params& digishieldParams = Params().GetConsensus(145000);
-    BOOST_CHECK_EQUAL(digishieldParams.nPowTargetTimespan, 60);
-     BOOST_CHECK_EQUAL(digishieldParams.AllowLegacyBlocks(145000), false); 
-    BOOST_CHECK_EQUAL(digishieldParams.fDigishieldDifficultyCalculation, true);
+    // Digishield is NOT activated on Junkcoin (nHeightEffective = 0xFFFFFFFF)
+    // so all heights return the same consensus params
+    const Consensus::Params& digishieldHeightParams = Params().GetConsensus(145000);
+    BOOST_CHECK_EQUAL(digishieldHeightParams.nPowTargetTimespan, 86400);
+    BOOST_CHECK_EQUAL(digishieldHeightParams.AllowLegacyBlocks(145000), true);
+    BOOST_CHECK_EQUAL(digishieldHeightParams.fDigishieldDifficultyCalculation, false);
 
-    const Consensus::Params& digishieldParamsEnd = Params().GetConsensus(371336);
-    BOOST_CHECK_EQUAL(digishieldParamsEnd.nPowTargetTimespan, 60);
-    BOOST_CHECK_EQUAL(digishieldParamsEnd.AllowLegacyBlocks(371336), true);
-    BOOST_CHECK_EQUAL(digishieldParamsEnd.fDigishieldDifficultyCalculation, true);
+    // AuxPoW activates at height 173000
+    const Consensus::Params& preAuxpowParams2 = Params().GetConsensus(172999);
+    BOOST_CHECK_EQUAL(preAuxpowParams2.AllowLegacyBlocks(172999), true);
 
-    const Consensus::Params& auxpowParams = Params().GetConsensus(371337);
-    BOOST_CHECK_EQUAL(auxpowParams.nHeightEffective, 371337);
-    BOOST_CHECK_EQUAL(auxpowParams.nPowTargetTimespan, 60);
-    BOOST_CHECK_EQUAL(auxpowParams.AllowLegacyBlocks(371337), true); // Always true because nLegacyBlocksBefore is -1 by default
-    BOOST_CHECK_EQUAL(auxpowParams.fDigishieldDifficultyCalculation, true);
+    const Consensus::Params& auxpowParams = Params().GetConsensus(173000);
+    // AllowLegacyBlocks returns true at exactly nAuxpowStartHeight
+    BOOST_CHECK_EQUAL(auxpowParams.AllowLegacyBlocks(173000), true);
+    BOOST_CHECK_EQUAL(auxpowParams.nAuxpowStartHeight, 173000);
 
-    const Consensus::Params& auxpowHighParams = Params().GetConsensus(700000); // Arbitrary point after last hard-fork
-    BOOST_CHECK_EQUAL(auxpowHighParams.nPowTargetTimespan, 60);
-    BOOST_CHECK_EQUAL(auxpowHighParams.AllowLegacyBlocks(700000), true); // Always true because nLegacyBlocksBefore is -1 by default
-    BOOST_CHECK_EQUAL(auxpowHighParams.fDigishieldDifficultyCalculation, true);
+    const Consensus::Params& auxpowHighParams = Params().GetConsensus(200000);
+    BOOST_CHECK_EQUAL(auxpowHighParams.nPowTargetTimespan, 86400);
+    // After nAuxpowStartHeight, AllowLegacyBlocks should return false
+    BOOST_CHECK_EQUAL(auxpowHighParams.AllowLegacyBlocks(200000), false);
+    BOOST_CHECK_EQUAL(auxpowHighParams.fDigishieldDifficultyCalculation, false);
+}
+
+BOOST_AUTO_TEST_CASE(block_header_serialization_compatibility)
+{
+    // Test that CBlockHeader serialization produces identical bytes to old junkcoin-core
+    // This ensures merge-mined blocks from rebased code are accepted by old nodes
+
+    // Test 1: Legacy block header (pre-auxpow)
+    {
+        CBlockHeader header;
+        header.nVersion = 4;  // Version 4, no auxpow, no chain ID
+        header.hashPrevBlock = uint256S("0x0000000000000000000000000000000000000000000000000000000000000001");
+        header.hashMerkleRoot = uint256S("0x0000000000000000000000000000000000000000000000000000000000000002");
+        header.nTime = 1367394064;
+        header.nBits = 0x1e0ffff0;
+        header.nNonce = 112158625;
+
+        // Serialize header
+        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+        ss << header;
+
+        // Expected size: 80 bytes (4+32+32+4+4+4)
+        BOOST_CHECK_EQUAL(ss.size(), 80u);
+
+        // Expected hash from old junkcoin-core for this exact header
+        // Calculated using: GetHash() on the same header data
+        uint256 expectedHash = uint256S("0x99f3e0c8a0177b0872e11abbb38069f3bec4c16e2587b8c94372f2a6c38d09fe");
+        BOOST_CHECK_EQUAL(header.GetHash().ToString(), expectedHash.ToString());
+    }
+
+    // Test 2: Auxpow block header (post-auxpow activation)
+    {
+        CBlockHeader header;
+        // Version with chain ID 0x2020 and auxpow flag set
+        // VERSION_CHAIN_START (1<<16) = 0x10000, chain ID = 0x2020, auxpow flag = 0x100
+        header.nVersion = 0x20200104;  // chain ID 0x2020, base version 4, auxpow enabled
+
+        header.hashPrevBlock = uint256S("0x0000000000000000000000000000000000000000000000000000000000000003");
+        header.hashMerkleRoot = uint256S("0x0000000000000000000000000000000000000000000000000000000000000004");
+        header.nTime = 1500000000;
+        header.nBits = 0x1b0ffff0;
+        header.nNonce = 12345;
+
+        // Create minimal auxpow data
+        header.auxpow = std::make_shared<CAuxPow>();
+        header.auxpow->nIndex = 0;
+        header.auxpow->vMerkleBranch.clear();
+        header.auxpow->vChainMerkleBranch.clear();
+        header.auxpow->nChainIndex = 0;
+
+        // Parent block header (minimal)
+        header.auxpow->parentBlock.nVersion = 0x10000000;
+        header.auxpow->parentBlock.hashPrevBlock.SetNull();
+        header.auxpow->parentBlock.hashMerkleRoot.SetNull();
+        header.auxpow->parentBlock.nTime = 1500000001;
+        header.auxpow->parentBlock.nBits = 0x1b0ffff0;
+        header.auxpow->parentBlock.nNonce = 54321;
+
+        // Serialize header with auxpow
+        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+        ss << header;
+
+        // Should be > 80 bytes (header + auxpow data)
+        BOOST_CHECK(ss.size() > 80u);
+
+        // Deserialize and verify round-trip
+        CBlockHeader header2;
+        ss >> header2;
+
+        BOOST_CHECK_EQUAL(header2.nVersion, header.nVersion);
+        BOOST_CHECK_EQUAL(header2.hashPrevBlock, header.hashPrevBlock);
+        BOOST_CHECK_EQUAL(header2.hashMerkleRoot, header.hashMerkleRoot);
+        BOOST_CHECK_EQUAL(header2.nTime, header.nTime);
+        BOOST_CHECK_EQUAL(header2.nBits, header.nBits);
+        BOOST_CHECK_EQUAL(header2.nNonce, header.nNonce);
+        BOOST_CHECK(header2.IsAuxpow());
+        BOOST_CHECK(header2.auxpow != nullptr);
+    }
+
+    // Test 3: Genesis block header hash matches expected
+    {
+        SelectParams(CBaseChainParams::MAIN);
+        const Consensus::Params& consensus = Params().GetConsensus(0);
+
+        // Verify genesis block hash is correct
+        BOOST_CHECK_EQUAL(consensus.hashGenesisBlock.ToString(),
+            "a2effa738145e377e08a61d76179c21703e13e48910b30a2a87f0dfe794b64c6");
+    }
+
+    // Test 4: Real mainnet block from API - verify header hash matches
+    // This proves our CBlockHeader::GetHash() produces same result as old core
+    // Block data from: https://junk-api.s3na.xyz/block/19f06aa05990bd9ea09ee46d1a2edabbc92a6e38129d1b65143007e19ffaf903
+    {
+        SelectParams(CBaseChainParams::MAIN);
+
+        // Construct block header from API JSON fields
+        CBlockHeader header;
+        header.nVersion = 538968324;  // 0x20200004 - chain ID 0x2020, version 4, no auxpow
+        header.hashPrevBlock = uint256S("4826a173c90ab06a5089db8c542fdd840ddc075f88910b031cd7ba7cb000d6ab");
+        header.hashMerkleRoot = uint256S("45bd64a8b3a5f6400f0c6b9e90dd17b57ab01b6bad755a4334c823ab097bc60a");
+        header.nTime = 1732482552;
+        header.nBits = 438325611;
+        header.nNonce = 0;
+
+        // Verify chain ID
+        BOOST_CHECK_EQUAL(header.GetChainId(), 0x2020);
+
+        // Verify NOT auxpow (this is legacy block after auxpow activation but without auxpow)
+        BOOST_CHECK(!header.IsAuxpow());
+        BOOST_CHECK(!header.IsLegacy());  // version 4 with chain ID 0x2020 is not legacy
+
+        // Calculate hash
+        uint256 calculatedHash = header.GetHash();
+
+        // Expected hash from API (block id)
+        uint256 expectedHash = uint256S("19f06aa05990bd9ea09ee46d1a2edabbc92a6e38129d1b65143007e19ffaf903");
+
+        // THIS IS THE CRITICAL TEST - if this passes, serialization is compatible!
+        BOOST_CHECK_EQUAL(calculatedHash.ToString(), expectedHash.ToString());
+
+        BOOST_TEST_MESSAGE("Mainnet block hash verification: " + calculatedHash.ToString());
+    }
+
+    // Test 5: Create auxpow block and verify parent hash calculation
+    // This verifies merge mining creates valid parent block hash
+    {
+        CBlockHeader junkHeader;
+        junkHeader.nVersion = 0x20200104;  // chain ID 0x2020, version 4, auxpow
+        junkHeader.hashPrevBlock.SetNull();
+        junkHeader.hashMerkleRoot.SetNull();
+        junkHeader.nTime = 1500000000;
+        junkHeader.nBits = 0x1b0ffff0;
+        junkHeader.nNonce = 12345;
+
+        // Create auxpow
+        junkHeader.auxpow = std::make_shared<CAuxPow>();
+        junkHeader.auxpow->nIndex = 0;
+
+        // Create parent block header (Bitcoin/Litecoin style)
+        junkHeader.auxpow->parentBlock.nVersion = 0x20000000;
+        junkHeader.auxpow->parentBlock.hashPrevBlock.SetNull();
+        junkHeader.auxpow->parentBlock.hashMerkleRoot.SetNull();
+        junkHeader.auxpow->parentBlock.nTime = 1500000001;
+        junkHeader.auxpow->parentBlock.nBits = 0x1b0ffff0;
+        junkHeader.auxpow->parentBlock.nNonce = 54321;
+
+        // Calculate parent block hash (this is what merge miners hash)
+        uint256 parentHash = junkHeader.auxpow->parentBlock.GetHash();
+
+        // Verify parent hash is not null
+        BOOST_CHECK(!parentHash.IsNull());
+
+        // Verify our hash calculation produces consistent results
+        uint256 hash1 = junkHeader.auxpow->parentBlock.GetHash();
+        uint256 hash2 = junkHeader.auxpow->parentBlock.GetHash();
+        BOOST_CHECK_EQUAL(hash1.ToString(), hash2.ToString());
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

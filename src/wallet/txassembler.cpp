@@ -1,5 +1,6 @@
 #include <wallet/txassembler.h>
 
+#include <chainparams.h>
 #include <consensus/tx_check.h>
 #include <consensus/validation.h>
 #include <policy/policy.h>
@@ -231,13 +232,46 @@ void TxAssembler::VerifyRecipients(const std::vector<CRecipient>& recipients)
         throw CreateTxError(_("Transaction must have at least one recipient"));
     }
 
+    // Junkcoin: Get current height and consensus params for activation checks
+    const int currentHeight = m_wallet.GetLastBlockHeight();
+    const Consensus::Params& consensus = Params().GetConsensus();
+
     CAmount nValue = 0;
     for (const auto& recipient : recipients) {
         if (recipient.IsMWEB() && recipients.size() > 1) {
             throw CreateTxError(_("Only one MWEB recipient supported at this time"));
         }
 
-        
+        // Junkcoin: Check MWEB activation
+        if (recipient.IsMWEB() && currentHeight < consensus.MWEBHeight) {
+            throw CreateTxError(strprintf(
+                _("Cannot send to MWEB addresses until block %d (current: %d). "
+                  "Using MWEB before activation makes funds vulnerable."),
+                consensus.MWEBHeight, currentHeight));
+        }
+
+        // Junkcoin: Check SegWit/Taproot activation for witness programs
+        if (!recipient.IsMWEB()) {
+            int witnessversion = 0;
+            std::vector<unsigned char> witnessprogram;
+            if (recipient.GetScript().IsWitnessProgram(witnessversion, witnessprogram)) {
+                // SegWit v0 (P2WPKH, P2WSH)
+                if (witnessversion == 0 && currentHeight < consensus.SegwitHeight) {
+                    throw CreateTxError(strprintf(
+                        _("Cannot send to SegWit (bech32) addresses until block %d (current: %d). "
+                          "Using SegWit before activation makes funds vulnerable."),
+                        consensus.SegwitHeight, currentHeight));
+                }
+                // Taproot v1+
+                if (witnessversion >= 1 && currentHeight < consensus.TaprootHeight) {
+                    throw CreateTxError(strprintf(
+                        _("Cannot send to Taproot addresses until block %d (current: %d). "
+                          "Using Taproot before activation makes funds vulnerable."),
+                        consensus.TaprootHeight, currentHeight));
+                }
+            }
+        }
+
         nValue += recipient.nAmount;
         if (nValue < 0 || recipient.nAmount < 0) {
             throw CreateTxError(_("Transaction amounts must not be negative"));
