@@ -132,8 +132,10 @@ public:
         consensus.fStrictChainId = true;
         consensus.nAuxpowStartHeight = 173000;
         
-        // Digishield parameters (NOT ACTIVE - set to never)
-        consensus.nHeightEffective = 0xFFFFFFFF; // Digishield not activated
+        // Base consensus is effective from genesis. It is the left leaf of the
+        // consensus tree; digishield (the root) never activates. Matches legacy
+        // junkcoin-core, which leaves the base consensus nHeightEffective at 0.
+        consensus.nHeightEffective = 0;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
