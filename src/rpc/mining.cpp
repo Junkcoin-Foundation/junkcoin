@@ -35,6 +35,8 @@
 #include <validationinterface.h>
 #include <versionbitsinfo.h>
 #include <warnings.h>
+#include <auxpow.h>
+#include <junkcoin.h>
 
 #include <memory>
 #include <stdint.h>
@@ -213,7 +215,7 @@ static RPCHelpMan generatetodescriptor()
         "\nMine blocks immediately to a specified descriptor (before the RPC call returns)\n",
         {
             {"num_blocks", RPCArg::Type::NUM, RPCArg::Optional::NO, "How many blocks are generated immediately."},
-            {"descriptor", RPCArg::Type::STR, RPCArg::Optional::NO, "The descriptor to send the newly generated litecoin to."},
+            {"descriptor", RPCArg::Type::STR, RPCArg::Optional::NO, "The descriptor to send the newly generated junkcoin to."},
             {"maxtries", RPCArg::Type::NUM, /* default */ ToString(DEFAULT_MAX_TRIES), "How many iterations to try."},
         },
         RPCResult{
@@ -261,7 +263,7 @@ static RPCHelpMan generatetoaddress()
                 "\nMine blocks immediately to a specified address (before the RPC call returns)\n",
                 {
                     {"nblocks", RPCArg::Type::NUM, RPCArg::Optional::NO, "How many blocks are generated immediately."},
-                    {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The address to send the newly generated litecoin to."},
+                    {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The address to send the newly generated junkcoin to."},
                     {"maxtries", RPCArg::Type::NUM, /* default */ ToString(DEFAULT_MAX_TRIES), "How many iterations to try."},
                 },
                 RPCResult{
@@ -272,7 +274,7 @@ static RPCHelpMan generatetoaddress()
                 RPCExamples{
             "\nGenerate 11 blocks to myaddress\n"
             + HelpExampleCli("generatetoaddress", "11 \"myaddress\"")
-            + "If you are using the " PACKAGE_NAME " wallet, you can get a new address to send the newly generated litecoin to with:\n"
+            + "If you are using the " PACKAGE_NAME " wallet, you can get a new address to send the newly generated junkcoin to with:\n"
             + HelpExampleCli("getnewaddress", "")
                 },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
@@ -300,7 +302,7 @@ static RPCHelpMan generateblock()
     return RPCHelpMan{"generateblock",
         "\nMine a block with a set of ordered transactions immediately to a specified address or descriptor (before the RPC call returns)\n",
         {
-            {"output", RPCArg::Type::STR, RPCArg::Optional::NO, "The address or descriptor to send the newly generated litecoin to."},
+            {"output", RPCArg::Type::STR, RPCArg::Optional::NO, "The address or descriptor to send the newly generated junkcoin to."},
             {"transactions", RPCArg::Type::ARR, RPCArg::Optional::NO, "An array of hex strings which are either txids or raw transactions.\n"
                 "Txids must reference transactions currently in the mempool.\n"
                 "All transactions must be valid and in valid order, otherwise the block will be rejected.",
@@ -678,6 +680,20 @@ static RPCHelpMan getblocktemplate()
             throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, PACKAGE_NAME " is in initial sync and waiting for blocks...");
     }
 
+    const CBlockIndex* pindexTip = ::ChainActive().Tip();
+    const int nextHeight = pindexTip ? pindexTip->nHeight + 1 : 0;
+    const Consensus::Params& consensus_params = Params().GetConsensus();
+    const bool requireSegwitRule = nextHeight >= consensus_params.SegwitHeight;
+    const ThresholdState mwebState = VersionBitsState(pindexTip, consensus_params, Consensus::DEPLOYMENT_MWEB, versionbitscache);
+    const bool requireMwebRule = mwebState == ThresholdState::ACTIVE;
+
+    if (requireSegwitRule && setClientRules.count("segwit") != 1) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "getblocktemplate must be called with the segwit rule set once segwit is active");
+    }
+    if (requireMwebRule && setClientRules.count("mweb") != 1) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "getblocktemplate must be called with the mweb rule set once MWEB is active");
+    }
+
     static unsigned int nTransactionsUpdatedLast;
     const CTxMemPool& mempool = EnsureMemPool(request.context);
 
@@ -729,9 +745,9 @@ static RPCHelpMan getblocktemplate()
     }
 
     // GBT must be called with 'segwit' and 'mweb' sets in the rules
-    if (setClientRules.count("segwit") != 1 || setClientRules.count("mweb") != 1) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "getblocktemplate must be called with the segwit & mweb rule sets (call with {\"rules\": [\"mweb\", \"segwit\"]})");
-    }
+    //if (setClientRules.count("segwit") != 1 || setClientRules.count("mweb") != 1) {
+    //    throw JSONRPCError(RPC_INVALID_PARAMETER, "getblocktemplate must be called with the segwit & mweb rule sets (call with {\"rules\": [\"mweb\", \"segwit\"]})");
+    //}
 
     // Update block
     static CBlockIndex* pindexPrev;
@@ -748,9 +764,38 @@ static RPCHelpMan getblocktemplate()
         CBlockIndex* pindexPrevNew = ::ChainActive().Tip();
         nStart = GetTime();
 
-        // Create new block
-        CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = BlockAssembler(mempool, Params()).CreateNewBlock(scriptDummy);
+        // Check if current block is within development fund active range
+        int nHeight = pindexPrevNew->nHeight + 1;
+        const CChainParams& chainparams = Params();
+        bool isDevFundActive = (nHeight > chainparams.GetDevelopmentFundStartHeight()) && 
+                               (nHeight <= chainparams.GetLastDevelopmentFundBlockHeight());
+
+        // Create new block with proper coinbase script
+        CScript scriptPubKey;
+
+        if (isDevFundActive) {
+            std::string strMinerAddress = gArgs.GetArg("-mineraddress", "");
+            if (!strMinerAddress.empty()) {
+                CTxDestination dest = DecodeDestination(strMinerAddress);
+                if (!IsValidDestination(dest)) {
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, 
+                        strprintf("Invalid miner address: '%s'. Must be a valid Junkcoin address.", strMinerAddress));
+                }
+                scriptPubKey = GetScriptForDestination(dest);
+                if (scriptPubKey.empty()) {
+                    throw JSONRPCError(RPC_INTERNAL_ERROR, "Failed to create script for miner address");
+                }
+            } else {
+                // Development fund active but no -mineraddress specified
+                // Fall back to dummy script - pools will replace coinbase anyway
+                scriptPubKey = CScript() << OP_TRUE;
+            }
+        } else {
+            // Outside development fund block range - fallback to original behavior with dummy script
+            scriptPubKey = CScript() << OP_TRUE;
+        }
+
+        pblocktemplate = BlockAssembler(mempool, Params()).CreateNewBlock(scriptPubKey);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -759,7 +804,7 @@ static RPCHelpMan getblocktemplate()
     }
     CHECK_NONFATAL(pindexPrev);
     CBlock* pblock = &pblocktemplate->block; // pointer for convenience
-    const Consensus::Params& consensusParams = Params().GetConsensus();
+    const Consensus::Params& consensusParams = consensus_params;
 
     // Update nTime
     UpdateTime(pblock, consensusParams, pindexPrev);
@@ -768,9 +813,16 @@ static RPCHelpMan getblocktemplate()
     // NOTE: If at some point we support pre-segwit miners post-segwit-activation, this needs to take segwit support into consideration
     const bool fPreSegWit = (pindexPrev->nHeight + 1 < consensusParams.SegwitHeight);
 
+    // Check if block is within development fund range
+    const CChainParams& chainparams = Params();
+    int nHeight = pindexPrev->nHeight + 1;
+    bool isDevFundActive = (nHeight > chainparams.GetDevelopmentFundStartHeight()) &&
+                           (nHeight <= chainparams.GetLastDevelopmentFundBlockHeight());
+
     UniValue aCaps(UniValue::VARR); aCaps.push_back("proposal");
 
     UniValue transactions(UniValue::VARR);
+    UniValue txCoinbase(UniValue::VNULL);
     std::map<uint256, int64_t> setTxIndex;
     int i = 0;
     for (const auto& it : pblock->vtx) {
@@ -778,8 +830,37 @@ static RPCHelpMan getblocktemplate()
         uint256 txHash = tx.GetHash();
         setTxIndex[txHash] = i++;
 
-        if (tx.IsCoinBase())
+        if (tx.IsCoinBase()) {
+            UniValue entry(UniValue::VOBJ);
+            
+            // Always include basic coinbase info
+            entry.pushKV("data", EncodeHexTx(tx));
+            entry.pushKV("txid", txHash.GetHex());
+            entry.pushKV("hash", tx.GetWitnessHash().GetHex());
+            entry.pushKV("required", true);
+            
+            // Get block height to check if we're in development fund active range
+            if (isDevFundActive && tx.vout.size() > 1) {
+                // Development fund is always the second output in coinbase
+                entry.pushKV("developmentfund", (int64_t)tx.vout[1].nValue);
+
+                // Add development fund address to gbt
+                const CScript& scriptPublicKey = tx.vout[1].scriptPubKey;
+                std::vector<CTxDestination> addresses;
+                TxoutType whichType;
+                int nRequired;
+
+                ExtractDestinations(scriptPublicKey, whichType, addresses, nRequired);
+                UniValue o(UniValue::VARR);
+                for (const CTxDestination& addr : addresses) {
+                    o.push_back(EncodeDestination(addr));
+                }
+                entry.pushKV("developmentfundaddress", o);
+            }
+            
+            txCoinbase = entry;
             continue;
+        }
 
         UniValue entry(UniValue::VOBJ);
 
@@ -821,7 +902,6 @@ static RPCHelpMan getblocktemplate()
     result.pushKV("capabilities", aCaps);
 
     UniValue aRules(UniValue::VARR);
-    aRules.push_back("csv");
     if (!fPreSegWit) aRules.push_back("!segwit");
     UniValue vbavailable(UniValue::VOBJ);
     for (int j = 0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++j) {
@@ -879,6 +959,9 @@ static RPCHelpMan getblocktemplate()
 
     result.pushKV("previousblockhash", pblock->hashPrevBlock.GetHex());
     result.pushKV("transactions", transactions);
+    if (!txCoinbase.isNull()) {
+        result.pushKV("coinbasetxn", txCoinbase);
+    }
     result.pushKV("coinbaseaux", aux);
     result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue);
     result.pushKV("longpollid", ::ChainActive().Tip()->GetBlockHash().GetHex() + ToString(nTransactionsUpdatedLast));
@@ -1223,6 +1306,352 @@ static RPCHelpMan estimaterawfee()
     };
 }
 
+/* ************************************************************************** */
+/* Merge mining.  */
+
+/**
+ * The variables below are used to keep track of created and not yet
+ * submitted auxpow blocks.  Lock them to be sure even for multiple
+ * RPC threads running in parallel.
+ */
+
+static Mutex cs_auxblockCache;
+static std::map<uint256, CBlock*> mapNewBlock GUARDED_BY(cs_auxblockCache);
+static std::vector<std::unique_ptr<CBlockTemplate>> vNewBlockTemplate GUARDED_BY(cs_auxblockCache);
+
+static void AuxMiningCheck(const NodeContext& node)
+{
+    if (!node.connman) {
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
+    }
+
+    if (node.connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0 && !Params().MineBlocksOnDemand()) {
+        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Junkcoin is not connected!");
+    }
+
+    if (::ChainstateActive().IsInitialBlockDownload() && !Params().MineBlocksOnDemand()) {
+        throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Junkcoin is downloading blocks...");
+    }
+
+    /* This should never fail, since the chain is already
+       past the point of merge-mining start.  Check nevertheless.  */
+    {
+        LOCK(cs_main);
+        const auto auxpowStart = Params().GetConsensus().nAuxpowStartHeight;
+        if (::ChainActive().Height() + 1 < auxpowStart) {
+            throw std::runtime_error("getauxblock method is not yet available");
+        }
+    }
+}
+
+static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey, const CTxMemPool& mempool)
+{
+    LOCK(cs_auxblockCache);
+
+    static unsigned nTransactionsUpdatedLast;
+    static const CBlockIndex* pindexPrev = nullptr;
+    static uint64_t nStart;
+    static std::map<CScriptID, CBlock*> curBlocks;
+    static unsigned nExtraNonce = 0;
+
+    /* Search for cached blocks with given scriptPubKey and assign it to pBlock
+     * if we find a match. This allows for creating multiple aux templates with
+     * a single junkcoind instance, for example when a pool runs multiple sub-
+     * pools with different payout strategies.
+     */
+    CBlock* pblock = nullptr;
+    CScriptID scriptID(scriptPubKey);
+    auto iter = curBlocks.find(scriptID);
+    if (iter != curBlocks.end()) pblock = iter->second;
+
+    {
+        LOCK(cs_main);
+
+        // Update block
+        if (pblock == nullptr || pindexPrev != ::ChainActive().Tip()
+            || (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast
+                && GetTime() - nStart > 60))
+        {
+            if (pindexPrev != ::ChainActive().Tip())
+            {
+                // Clear old blocks since they're obsolete now.
+                mapNewBlock.clear();
+                vNewBlockTemplate.clear();
+                curBlocks.clear();
+                pblock = nullptr;
+            }
+
+            // Create new block with nonce = 0 and extraNonce = 1
+            std::unique_ptr<CBlockTemplate> newBlock = BlockAssembler(mempool, Params()).CreateNewBlock(scriptPubKey);
+            if (!newBlock) {
+                throw JSONRPCError(RPC_OUT_OF_MEMORY, "out of memory");
+            }
+
+            // Update state only when CreateNewBlock succeeded
+            nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
+            pindexPrev = ::ChainActive().Tip();
+            nStart = GetTime();
+
+            // Finalise it by setting the version and building the merkle root
+            IncrementExtraNonce(&newBlock->block, pindexPrev, nExtraNonce);
+            newBlock->block.SetAuxpowVersion(true);
+
+            // Save
+            pblock = &newBlock->block;
+            curBlocks[scriptID] = pblock;
+            mapNewBlock[pblock->GetHash()] = pblock;
+            vNewBlockTemplate.push_back(std::move(newBlock));
+        }
+    }
+
+    // Verify dev fund output is present if required
+    const CChainParams& chainparams = Params();
+    int blockHeight = pindexPrev->nHeight + 1;
+    bool isDevFundActive = (blockHeight > chainparams.GetDevelopmentFundStartHeight()) &&
+                           (blockHeight <= chainparams.GetLastDevelopmentFundBlockHeight());
+
+    LogPrintf("AuxMiningCreateBlock: height=%d, devFundActive=%d, coinbase vout.size=%d\n",
+              blockHeight, isDevFundActive, pblock->vtx[0]->vout.size());
+
+    if (isDevFundActive) {
+        if (pblock->vtx[0]->vout.size() < 2) {
+            LogPrintf("ERROR: AuxMiningCreateBlock: Dev fund required but coinbase has only %d outputs! Forcing block regeneration.\n",
+                      pblock->vtx[0]->vout.size());
+            // Force regeneration by clearing cache
+            mapNewBlock.clear();
+            vNewBlockTemplate.clear();
+            curBlocks.clear();
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Block generation failed: dev fund output missing. Please retry.");
+        }
+        // Verify dev fund amount is correct
+        CAmount baseReward = GetBlockSubsidy(blockHeight, chainparams.GetConsensus());
+        CAmount expectedDevFund = baseReward * chainparams.GetDevelopmentFundPercent();
+        LogPrintf("AuxMiningCreateBlock: Verifying dev fund: expected=%lld, actual vout[1]=%lld\n",
+                  expectedDevFund, pblock->vtx[0]->vout[1].nValue);
+    }
+
+    // At this point, pblock is always initialised
+    assert(pblock);
+
+    arith_uint256 target;
+    bool fNegative, fOverflow;
+    target.SetCompact(pblock->nBits, &fNegative, &fOverflow);
+    if (fNegative || fOverflow || target == 0) {
+        throw std::runtime_error("invalid difficulty bits in block");
+    }
+
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("hash", pblock->GetHash().GetHex());
+    result.pushKV("chainid", pblock->GetChainId());
+    result.pushKV("previousblockhash", pblock->hashPrevBlock.GetHex());
+    result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue);
+    result.pushKV("bits", strprintf("%08x", pblock->nBits));
+    result.pushKV("height", static_cast<int64_t>(pindexPrev->nHeight + 1));
+    result.pushKV("target", ArithToUint256(target).GetHex());
+
+    return result;
+}
+
+static bool AuxMiningSubmitBlock(const std::string& hashHex, const std::string& auxpowHex)
+{
+    LOCK(cs_auxblockCache);
+
+    uint256 hash;
+    hash.SetHex(hashHex);
+
+    const std::map<uint256, CBlock*>::iterator mit = mapNewBlock.find(hash);
+    if (mit == mapNewBlock.end()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "block hash unknown");
+    }
+    CBlock& block = *mit->second;
+
+    const std::vector<unsigned char> vchAuxPow = ParseHex(auxpowHex);
+    CDataStream ss(vchAuxPow, SER_GETHASH, PROTOCOL_VERSION);
+    CAuxPow pow;
+    ss >> pow;
+    block.auxpow = std::make_shared<CAuxPow>(pow);
+    block.SetAuxpowVersion(true);
+    assert(block.GetHash() == hash);
+
+    std::shared_ptr<const CBlock> shared_block = std::make_shared<const CBlock>(block);
+    bool fAccepted = g_chainman.ProcessNewBlock(Params(), shared_block, true, nullptr);
+
+    return fAccepted;
+}
+
+static RPCHelpMan getauxblock()
+{
+    return RPCHelpMan{"getauxblock",
+                "\nCreate or submit a merge-mined block.\n"
+                "\nWithout arguments, create a new block and return information\n"
+                "required to merge-mine it.  With arguments, submit a solved\n"
+                "auxpow for a previously returned block.\n",
+                {
+                    {"hash", RPCArg::Type::STR_HEX, RPCArg::Optional::OMITTED_NAMED_ARG, "Hash of the block to submit"},
+                    {"auxpow", RPCArg::Type::STR_HEX, RPCArg::Optional::OMITTED_NAMED_ARG, "Serialised auxpow found"},
+                },
+                {
+                    RPCResult{"without arguments",
+                        RPCResult::Type::OBJ, "", "",
+                        {
+                            {RPCResult::Type::STR_HEX, "hash", "hash of the created block"},
+                            {RPCResult::Type::NUM, "chainid", "chain ID for this block"},
+                            {RPCResult::Type::STR_HEX, "previousblockhash", "hash of the previous block"},
+                            {RPCResult::Type::NUM, "coinbasevalue", "value of the block's coinbase"},
+                            {RPCResult::Type::STR_HEX, "bits", "compressed target of the block"},
+                            {RPCResult::Type::NUM, "height", "height of the block"},
+                            {RPCResult::Type::STR_HEX, "target", "target in reversed byte order"},
+                        }
+                    },
+                    RPCResult{"with arguments",
+                        RPCResult::Type::BOOL, "", "whether the submitted block was correct"
+                    },
+                },
+                RPCExamples{
+                    HelpExampleCli("getauxblock", "")
+            + HelpExampleCli("getauxblock", "\"hash\" \"serialised auxpow\"")
+            + HelpExampleRpc("getauxblock", "")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    NodeContext& node = EnsureNodeContext(request.context);
+    const CTxMemPool& mempool = EnsureMemPool(request.context);
+
+    AuxMiningCheck(node);
+
+    /* Create a new block? */
+    if (request.params[0].isNull()) {
+        // Use mineraddress if available, otherwise use dummy script
+        CScript scriptPubKey;
+        std::string strMinerAddress = gArgs.GetArg("-mineraddress", "");
+        if (!strMinerAddress.empty()) {
+            CTxDestination dest = DecodeDestination(strMinerAddress);
+            if (IsValidDestination(dest)) {
+                scriptPubKey = GetScriptForDestination(dest);
+            }
+        }
+        if (scriptPubKey.empty()) {
+            scriptPubKey = CScript() << OP_TRUE;
+        }
+        return AuxMiningCreateBlock(scriptPubKey, mempool);
+    }
+
+    /* Submit a block instead. */
+    bool fAccepted = AuxMiningSubmitBlock(request.params[0].get_str(), request.params[1].get_str());
+    return fAccepted;
+},
+    };
+}
+
+static RPCHelpMan createauxblock()
+{
+    return RPCHelpMan{"createauxblock",
+                "\nCreate a new block and return information required to merge-mine it.\n",
+                {
+                    {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "Coinbase transaction payout address"},
+                },
+                RPCResult{
+                    RPCResult::Type::OBJ, "", "",
+                    {
+                        {RPCResult::Type::STR_HEX, "hash", "hash of the created block"},
+                        {RPCResult::Type::NUM, "chainid", "chain ID for this block"},
+                        {RPCResult::Type::STR_HEX, "previousblockhash", "hash of the previous block"},
+                        {RPCResult::Type::NUM, "coinbasevalue", "value of the block's coinbase"},
+                        {RPCResult::Type::STR_HEX, "bits", "compressed target of the block"},
+                        {RPCResult::Type::NUM, "height", "height of the block"},
+                        {RPCResult::Type::STR_HEX, "target", "target in reversed byte order"},
+                    }
+                },
+                RPCExamples{
+                    HelpExampleCli("createauxblock", "\"address\"")
+            + HelpExampleRpc("createauxblock", "\"address\"")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    NodeContext& node = EnsureNodeContext(request.context);
+    const CTxMemPool& mempool = EnsureMemPool(request.context);
+
+    AuxMiningCheck(node);
+
+    // Check coinbase payout address
+    CTxDestination dest = DecodeDestination(request.params[0].get_str());
+    if (!IsValidDestination(dest)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid coinbase payout address");
+    }
+
+    const CScript scriptPubKey = GetScriptForDestination(dest);
+    return AuxMiningCreateBlock(scriptPubKey, mempool);
+},
+    };
+}
+
+static RPCHelpMan submitauxblock()
+{
+    return RPCHelpMan{"submitauxblock",
+                "\nSubmit a solved auxpow for a previously block created by 'createauxblock'.\n",
+                {
+                    {"hash", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Hash of the block to submit"},
+                    {"auxpow", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Serialised auxpow found"},
+                },
+                RPCResult{
+                    RPCResult::Type::BOOL, "", "whether the submitted block was correct"
+                },
+                RPCExamples{
+                    HelpExampleCli("submitauxblock", "\"hash\" \"serialised auxpow\"")
+            + HelpExampleRpc("submitauxblock", "\"hash\" \"serialised auxpow\"")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    NodeContext& node = EnsureNodeContext(request.context);
+    AuxMiningCheck(node);
+
+    return AuxMiningSubmitBlock(request.params[0].get_str(), request.params[1].get_str());
+},
+    };
+}
+
+static RPCHelpMan getblocksubsidy()
+{
+    return RPCHelpMan{"getblocksubsidy",
+                "\nReturns block subsidy reward, taking into account the mining slow start and the development fund (20% of base reward), of block at index provided.\n",
+                {
+                    {"height", RPCArg::Type::NUM, /* default */ "current height", "The block height"},
+                },
+                RPCResult{
+                    RPCResult::Type::OBJ, "", "",
+                    {
+                        {RPCResult::Type::STR_AMOUNT, "miner", "The mining reward amount in " + CURRENCY_UNIT},
+                        {RPCResult::Type::STR_AMOUNT, "developmentfund", "The development fund amount (20% of base reward) in " + CURRENCY_UNIT},
+                    }
+                },
+                RPCExamples{
+                    HelpExampleCli("getblocksubsidy", "1000")
+            + HelpExampleRpc("getblocksubsidy", "1000")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    LOCK(cs_main);
+    const CChainParams& chainparams = Params();
+
+    int nHeight = request.params[0].isNull() ? ::ChainActive().Height() : request.params[0].get_int();
+    if (nHeight < 0)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
+
+    CAmount nReward = GetBlockSubsidy(nHeight, chainparams.GetConsensus());
+    CAmount nDevelopmentFund = 0;
+    if ((nHeight > chainparams.GetDevelopmentFundStartHeight()) && (nHeight <= chainparams.GetLastDevelopmentFundBlockHeight())) {
+        nDevelopmentFund = nReward * chainparams.GetDevelopmentFundPercent(); // 20% of base reward
+        nReward -= nDevelopmentFund;
+    }
+
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("miner", ValueFromAmount(nReward));
+    result.pushKV("developmentfund", ValueFromAmount(nDevelopmentFund));
+    return result;
+},
+    };
+}
+
 void RegisterMiningRPCCommands(CRPCTable &t)
 {
 // clang-format off
@@ -1235,7 +1664,11 @@ static const CRPCCommand commands[] =
     { "mining",             "getblocktemplate",       &getblocktemplate,       {"template_request"} },
     { "mining",             "submitblock",            &submitblock,            {"hexdata","dummy"} },
     { "mining",             "submitheader",           &submitheader,           {"hexdata"} },
+    { "mining",             "getblocksubsidy",        &getblocksubsidy,        {"height"} },
 
+    { "mining",             "getauxblock",            &getauxblock,            {"hash", "auxpow"} },
+    { "mining",             "createauxblock",         &createauxblock,         {"address"} },
+    { "mining",             "submitauxblock",         &submitauxblock,         {"hash", "auxpow"} },
 
     { "generating",         "generatetoaddress",      &generatetoaddress,      {"nblocks","address","maxtries"} },
     { "generating",         "generatetodescriptor",   &generatetodescriptor,   {"num_blocks","descriptor","maxtries"} },

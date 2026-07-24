@@ -9,14 +9,32 @@
 #include <chain.h>
 #include <primitives/block.h>
 #include <uint256.h>
+#include <junkcoin.h>
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
-    assert(pindexLast != nullptr);
     unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
 
+    // Genesis block
+    if (pindexLast == NULL)
+        return nProofOfWorkLimit;
+
+    // junkcoin: Special rules for minimum difficulty blocks with Digishield
+    if (AllowDigishieldMinDifficultyForBlock(pindexLast, pblock, params))
+    {
+        // Special difficulty rule for testnet:
+        // If the new block's timestamp is more than 2* nTargetSpacing minutes
+        // then allow mining of a min-difficulty block.
+        return nProofOfWorkLimit;
+    }
+
     // Only change once per difficulty adjustment interval
-    if ((pindexLast->nHeight+1) % params.DifficultyAdjustmentInterval() != 0)
+    bool fNewDifficultyProtocol = (pindexLast->nHeight+1 >= 69360);
+
+    const int64_t nTargetTimespanCurrent = fNewDifficultyProtocol ? params.nPowTargetTimespan : (params.nPowTargetTimespan*12);
+    const int64_t difficultyAdjustmentInterval = nTargetTimespanCurrent / params.nPowTargetSpacing;
+
+    if ((pindexLast->nHeight+1) % difficultyAdjustmentInterval != 0)
     {
         if (params.fPowAllowMinDifficultyBlocks)
         {
@@ -37,21 +55,19 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         return pindexLast->nBits;
     }
 
-    // Go back by what we want to be 14 days worth of blocks
     // Litecoin: This fixes an issue where a 51% attack can change difficulty at will.
     // Go back the full period unless it's the first retarget after genesis. Code courtesy of Art Forz
-    int blockstogoback = params.DifficultyAdjustmentInterval()-1;
-    if ((pindexLast->nHeight+1) != params.DifficultyAdjustmentInterval())
-        blockstogoback = params.DifficultyAdjustmentInterval();
+    int blockstogoback = difficultyAdjustmentInterval-1;
+    if ((pindexLast->nHeight+1) != difficultyAdjustmentInterval)
+        blockstogoback = difficultyAdjustmentInterval;
 
     // Go back by what we want to be 14 days worth of blocks
-    const CBlockIndex* pindexFirst = pindexLast;
-    for (int i = 0; pindexFirst && i < blockstogoback; i++)
-        pindexFirst = pindexFirst->pprev;
-
+    int nHeightFirst = pindexLast->nHeight - blockstogoback;
+    assert(nHeightFirst >= 0);
+    const CBlockIndex* pindexFirst = pindexLast->GetAncestor(nHeightFirst);
     assert(pindexFirst);
 
-    return CalculateNextWorkRequired(pindexLast, pindexFirst->GetBlockTime(), params);
+    return CalculateJunkcoinNextWorkRequired(fNewDifficultyProtocol, nTargetTimespanCurrent, pindexLast, pindexFirst->GetBlockTime(), params);
 }
 
 unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nFirstBlockTime, const Consensus::Params& params)
@@ -71,7 +87,7 @@ unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nF
     arith_uint256 bnOld;
     bnNew.SetCompact(pindexLast->nBits);
     bnOld = bnNew;
-    // Litecoin: intermediate uint256 can overflow by 1 bit
+    // Junkcoin: intermediate uint256 can overflow by 1 bit
     const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
     bool fShift = bnNew.bits() > bnPowLimit.bits() - 1;
     if (fShift)
@@ -104,4 +120,10 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params&
         return false;
 
     return true;
+}
+
+// Wrapper for block header PoW check that supports AuxPoW
+bool CheckProofOfWork(const CBlockHeader& block, const Consensus::Params& params)
+{
+    return CheckAuxPowProofOfWork(block, params);
 }

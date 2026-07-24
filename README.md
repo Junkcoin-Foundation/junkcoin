@@ -1,85 +1,61 @@
-Litecoin Core integration/staging tree
-=====================================
+<p align="center">
+  <img src="https://github.com/Junkcoin-Foundation/junkcoin-docs/blob/main/assets/logos/logo-junkcoin-horizontal-2500px.png" alt="Junkcoin Logo" width="350"/>
+</p>
 
-[![Build Status](https://travis-ci.org/litecoin-project/litecoin.svg?branch=master)](https://travis-ci.org/litecoin-project/litecoin)
+# Junkcoin Core
 
-https://litecoin.org
+The **Junkcoin Core** repository hosts the source code for the core of Junkcoin, a historic blockchain launched on **May 3, 2013**, and revived in **November 2024**. Designed as a fork of Litecoin, Junkcoin combines the reliability of Litecoin with exciting features like **random bonus blocks**, making mining a unique and engaging experience.
 
-What is Litecoin?
-----------------
+This repository hosts the **next main Junkcoin Core codebase**, succeeding previous development efforts. It combines the reliability of a clean Litecoin lineage with Junkcoin's unique consensus rules, serving as the foundation for the development, maintenance, and continuous improvement of the Junkcoin Core, ensuring stability, security, and performance.
 
-Litecoin is an experimental digital currency that enables instant payments to
-anyone, anywhere in the world. Litecoin uses peer-to-peer technology to operate
-with no central authority: managing transactions and issuing money are carried
-out collectively by the network. Litecoin Core is the name of open source
-software which enables the use of this currency.
+## Branches
+This repository follows a clear branching strategy:
+- **`master`**: Stable releases. This is the default branch, hosting thoroughly tested and production-ready code.
+- **`dev`**: Active development and feature work. All new contributions and updates are first merged here before reaching `master`.
 
-For more information, as well as an immediately useable, binary version of
-the Litecoin Core software, see [https://litecoin.org](https://litecoin.org).
+## Mining Rules
+Junkcoin operates on a **Proof-of-Work (PoW)** consensus mechanism. Its current mining parameters, based on the network's consensus code, include:
 
-License
--------
+- **Total supply**: 54 million JKC.
+- **Block time**: 1 minute (60 seconds).
+- **Difficulty adjustment**: Every 4 hours (every 240 blocks).
+- **Reward schedule**:
+  - **Day 1**: 500 coins per block.
+  - **Day 2**: 200 coins per block.
+  - **Day 3 & 4**: 100 coins per block.
+  - **Months 1 to 6 (approx)**: 50 coins per block.
+  - **Months 6 to 9 (approx)**: 25 coins per block.
+  - **Months 9 to 15 (approx)**: 12.5 coins per block.
+  - **Afterwards**: Subsidy continues to halve gradually according to a custom schedule defined in the codebase.
 
-Litecoin Core is released under the terms of the MIT license. See [COPYING](COPYING) for more
-information or see https://opensource.org/licenses/MIT.
+### **Lottery Blocks (Random Bonus Blocks)**
+In addition to the regular mining rewards, Junkcoin features **random bonus blocks** to incentivize miners and add excitement to the mining process. These include:
+- **1% chance**: A block will yield **triple (3x)** the normal reward.
+- **0.01% chance**: A block will yield **1,000 coins**, regardless of the mining phase.
 
-Development Process
--------------------
+This innovative feature brings an element of unpredictability and fun to the mining process, setting Junkcoin apart from other PoW cryptocurrencies.
 
-The `master` branch is regularly built (see `doc/build-*.md` for instructions) and tested, but it is not guaranteed to be
-completely stable. [Tags](https://github.com/litecoin-project/litecoin/tags) are created
-regularly from release branches to indicate new official, stable release versions of Litecoin Core.
+## Ports
 
-The https://github.com/litecoin-project/gui repository is used exclusively for the
-development of the GUI. Its master branch is identical in all monotree
-repositories. Release branches and tags do not exist, so please do not fork
-that repository unless it is for development reasons.
+### **Default Ports**
+- **Connection**: 9771
+- **JSON-RPC**: 9771
 
-The contribution workflow is described in [CONTRIBUTING.md](CONTRIBUTING.md)
-and useful hints for developers can be found in [doc/developer-notes.md](doc/developer-notes.md).
+### **Testnet Ports**
+- **Connection**: 19771
+- **JSON-RPC**: 19771
 
-The developer [mailing list](https://groups.google.com/forum/#!forum/litecoin-dev)
-should be used to discuss complicated or controversial changes before working
-on a patch set.
+## Official Junkcoin Website
+For more information, please visit the official Junkcoin website:
+[https://junk-coin.com](https://junk-coin.com)
 
-Developer IRC can be found on Freenode at #litecoin-dev.
+## Technical Support
+For technical support, join our dedicated developer channel on Telegram. Simply contact the admins in our main Telegram group and request access:
+[https://t.me/junkcoin_JKC](https://t.me/junkcoin_JKC)
 
-Testing
--------
+## Official Junkcoin Twitter/X
+Join us on X (formerly Twitter) here:
+[https://x.com/junkcoinJKC](https://x.com/junkcoinJKC)
 
-Testing and code review is the bottleneck for development; we get more pull
-requests than we can review and test on short notice. Please be patient and help out by testing
-other people's pull requests, and remember this is a security-critical project where any mistake might cost people
-lots of money.
-
-### Automated Testing
-
-Developers are strongly encouraged to write [unit tests](src/test/README.md) for new code, and to
-submit new unit tests for old code. Unit tests can be compiled and run
-(assuming they weren't disabled in configure) with: `make check`. Further details on running
-and extending unit tests can be found in [/src/test/README.md](/src/test/README.md).
-
-There are also [regression and integration tests](/test), written
-in Python, that are run automatically on the build server.
-These tests can be run (if the [test dependencies](/test) are installed) with: `test/functional/test_runner.py`
-
-The Travis CI system makes sure that every pull request is built for Windows, Linux, and macOS, and that unit/sanity tests are run automatically.
-
-### Manual Quality Assurance (QA) Testing
-
-Changes should be tested by somebody other than the developer who wrote the
-code. This is especially important for large or high-risk changes. It is useful
-to add a test plan to the pull request description if testing the changes is
-not straightforward.
-
-Translations
-------------
-
-We only accept translation fixes that are submitted through [Bitcoin Core's Transifex page](https://www.transifex.com/projects/p/bitcoin/).
-Translations are converted to Litecoin periodically.
-
-Translations are periodically pulled from Transifex and merged into the git repository. See the
-[translation process](doc/translation_process.md) for details on how this works.
-
-**Important**: We do not accept translation changes as GitHub pull requests because the next
-pull from Transifex would automatically overwrite them again.
+## License
+This project is licensed under the **MIT License**, ensuring it remains open-source and community-driven.

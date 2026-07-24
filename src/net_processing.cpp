@@ -2636,6 +2636,30 @@ void PeerManager::ProcessMessage(CNode& pfrom, const std::string& msg_type, CDat
             vRecv >> LIMITED_STRING(strSubVer, MAX_SUBVERSION_LENGTH);
             cleanSubVer = SanitizeString(strSubVer);
         }
+
+        // Peer version filtering: Only accept Junkcoin peers, reject Litecoin peers
+        // Allowed patterns:
+        // - JKC:3.1.1 (original Junkcoin Core v3.1.1)
+        // - JunkcoinCore:4.* (new Junkcoin Core v4.x.x)
+        if (!cleanSubVer.empty()) {
+            bool isValidJunkcoinPeer = false;
+
+            // Check for JKC:3.1.1 (original Junkcoin Core)
+            if (cleanSubVer.find("JKC:3.1.1") != std::string::npos) {
+                isValidJunkcoinPeer = true;
+            }
+            // Check for JunkcoinCore:4.* (new Junkcoin Core v4.x.x)
+            else if (cleanSubVer.find("JunkcoinCore:4.") != std::string::npos) {
+                isValidJunkcoinPeer = true;
+            }
+
+            if (!isValidJunkcoinPeer) {
+                LogPrint(BCLog::NET, "peer=%d has invalid user agent '%s'; disconnecting\n", pfrom.GetId(), cleanSubVer);
+                pfrom.fDisconnect = true;
+                return;
+            }
+        }
+
         if (!vRecv.empty()) {
             vRecv >> nStartingHeight;
         }
@@ -2932,6 +2956,17 @@ void PeerManager::ProcessMessage(CNode& pfrom, const std::string& msg_type, CDat
             } else {
                 peer->m_addr_token_bucket -= 1.0;
             }
+
+            // Junkcoin: Filter out Litecoin peer addresses (port 9333)
+            // Old Junkcoin nodes share mixed address books containing both Junkcoin and Litecoin peers
+            // We reject Litecoin addresses here to prevent addrman contamination
+            // Note: This only filters the default Litecoin port; custom ports are allowed
+            if (addr.GetPort() == 9333) {
+                LogPrint(BCLog::NET, "Ignoring Litecoin peer address %s (port 9333) from peer=%d\n",
+                         addr.ToString(), pfrom.GetId());
+                continue;
+            }
+
             // We only bother storing full nodes, though this may include
             // things which we would not make an outbound connection to, in
             // part because we may make feeler connections to them.
@@ -3259,7 +3294,15 @@ void PeerManager::ProcessMessage(CNode& pfrom, const std::string& msg_type, CDat
                 pindex = ::ChainActive().Next(pindex);
         }
 
-        // we must use CBlocks, as CBlockHeaders won't include the 0x00 nTx count at the end
+        // Use CBlock for headers message to match Junkcoin Core protocol.
+        // CBlockHeader now includes AuxPoW data in serialization if IsAuxpow() is true.
+        // The network protocol expects:
+        // [header count: compact size]
+        // [header 1: 80 bytes + AuxPoW data if present]
+        // [tx count 1: compact size = 0]
+        // [header 2: 80 bytes + AuxPoW data if present]
+        // [tx count 2: compact size = 0]
+        // ...
         std::vector<CBlock> vHeaders;
         int nLimit = MAX_HEADERS_RESULTS;
         LogPrint(BCLog::NET, "getheaders %d to %s from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop.IsNull() ? "end" : hashStop.ToString(), pfrom.GetId());
