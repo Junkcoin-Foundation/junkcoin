@@ -82,6 +82,8 @@ struct Params {
     /** Block height at which MWEB becomes active.
      * Set to std::numeric_limits<int>::max() to disable. */
     int MWEBHeight;
+    /** Block height at which legacy disabled opcodes (OP_CAT, OP_MUL, etc.) are re-enabled. */
+    int DisabledScriptReactivationHeight;
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and segwit activations. */
     int MinBIP9WarningHeight;

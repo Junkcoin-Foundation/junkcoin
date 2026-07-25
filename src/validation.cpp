@@ -2007,6 +2007,11 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex* pindex, const Consens
         flags |= SCRIPT_VERIFY_TAPROOT;
     }
 
+    // Junkcoin: Re-enable legacy opcodes (OP_CAT, OP_MUL, etc.)
+    if (pindex->nHeight >= consensusparams.DisabledScriptReactivationHeight) {
+        flags |= SCRIPT_VERIFY_DISABLED_OPCODES_REENABLED;
+    }
+
     // Start enforcing BIP147 NULLDUMMY (activated simultaneously with segwit)
     if (IsWitnessEnabled(pindex->pprev, consensusparams)) {
         flags |= SCRIPT_VERIFY_WITNESS;

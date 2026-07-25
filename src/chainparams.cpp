@@ -74,13 +74,15 @@ public:
         consensus.BIP34Hash = uint256S("0xa2effa738145e377e08a61d76179c21703e13e48910b30a2a87f0dfe794b64c6"); // genesis
         consensus.BIP65Height = 0x210c; // 8460
         consensus.BIP66Height = 0x210c; // 8460
-        consensus.CSVHeight = std::numeric_limits<int>::max(); // Disabled
+        consensus.CSVHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
         // Junkcoin: SegWit disabled
-        consensus.SegwitHeight = std::numeric_limits<int>::max();
+        consensus.SegwitHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
         // Junkcoin: Taproot disabled
-        consensus.TaprootHeight = std::numeric_limits<int>::max();
+        consensus.TaprootHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
+        // Junkcoin: Re-enable legacy disabled opcodes (OP_CAT, OP_MUL, etc.)
+        consensus.DisabledScriptReactivationHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
         // Junkcoin: MWEB disabled
-        consensus.MWEBHeight = std::numeric_limits<int>::max();
+        consensus.MWEBHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
         consensus.MinBIP9WarningHeight = 10080 + 10080; // miner confirmation window
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 24 * 60 * 60; // 1 day
@@ -109,21 +111,21 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1724732207;     // 2024-09-26 05:16:47 UTC
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1764490155;      // 2025-12-25 18:00:00 UTC
 
-        // Junkcoin: SegWit disabled - compatible with junkcoin-core
+        // Junkcoin: SegWit disabled - compatible with legacy core
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].bit = 4;
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartHeight = std::numeric_limits<int>::max();
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeoutHeight = std::numeric_limits<int>::max();
 
-        // Junkcoin: Taproot disabled - compatible with junkcoin-core
+        // Junkcoin: Taproot disabled - compatible with legacy core
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 6;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = std::numeric_limits<int>::max();
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = std::numeric_limits<int>::max();
 
-        // Junkcoin: MWEB disabled - compatible with junkcoin-core
+        // Junkcoin: MWEB disabled - compatible with legacy core
         consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].bit = 7;
         consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
@@ -270,10 +272,11 @@ public:
         consensus.BIP34Hash = uint256S("0x00"); // unused for now.
         consensus.BIP65Height = 99999999;
         consensus.BIP66Height = 99999999;
-        consensus.CSVHeight = std::numeric_limits<int>::max();      // Disabled to match junkcoin-core
-        consensus.SegwitHeight = std::numeric_limits<int>::max();   // Disabled to match junkcoin-core
-        consensus.TaprootHeight = std::numeric_limits<int>::max();  // Disabled - Taproot not supported
-        consensus.MWEBHeight = std::numeric_limits<int>::max();     // Disabled to match junkcoin-core
+        consensus.CSVHeight = 120000;      // Activate CSV at block 120,000
+        consensus.SegwitHeight = 140000;   // Activate SegWit at block 140,000 (+20k)
+        consensus.TaprootHeight = 160000;  // Activate Taproot at block 160,000 (+20k)
+        consensus.DisabledScriptReactivationHeight = 160000; // Re-enable opcodes (OP_CAT, OP_MUL, etc.) (+20k)
+        consensus.MWEBHeight = 180000;     // Activate MWEB at block 180,000 (+20k)
         consensus.MinBIP9WarningHeight = 111440;
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 4 * 60 * 60; // 4H - match junkcoin-core
@@ -309,25 +312,25 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1703462400; // 2023-12-25 00:00:00
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1735084800;   // 2024-12-25 18:00:00
 
-        // Junkcoin: SegWit disabled - compatible with junkcoin-core
+        // Junkcoin testnet: SegWit scheduled activation
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].bit = 4;
-        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartHeight = std::numeric_limits<int>::max();
+        consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nStartHeight = 140000;
         consensus.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeoutHeight = std::numeric_limits<int>::max();
 
-        // Junkcoin: Taproot disabled - compatible with junkcoin-core
+        // Junkcoin testnet: Taproot scheduled activation
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 6;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = std::numeric_limits<int>::max();
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartHeight = 160000;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeoutHeight = std::numeric_limits<int>::max();
 
-        // Junkcoin: MWEB disabled - compatible with junkcoin-core
+        // Junkcoin testnet: MWEB scheduled activation
         consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].bit = 7;
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = std::numeric_limits<int>::max();
+        consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nStartHeight = 180000;
         consensus.vDeployments[Consensus::DEPLOYMENT_MWEB].nTimeoutHeight = std::numeric_limits<int>::max();
 
         consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000");
@@ -430,10 +433,11 @@ public:
         consensus.BIP34Hash = uint256S("0x00"); // unused for now.
         consensus.BIP65Height = 99999999; // Disabled - match junkcoin-core
         consensus.BIP66Height = 99999999; // Disabled - match junkcoin-core
-        consensus.CSVHeight = std::numeric_limits<int>::max();      // Disabled - match junkcoin-core
-        consensus.SegwitHeight = std::numeric_limits<int>::max();   // Disabled - match junkcoin-core
-        consensus.TaprootHeight = std::numeric_limits<int>::max();  // Disabled - Taproot not supported
-        consensus.MWEBHeight = std::numeric_limits<int>::max();     // Disabled - match junkcoin-core
+        consensus.CSVHeight = 0;
+        consensus.SegwitHeight = 0;
+        consensus.TaprootHeight = 0;
+        consensus.DisabledScriptReactivationHeight = 0;
+        consensus.MWEBHeight = 0;
         consensus.MinBIP9WarningHeight = 0;
         consensus.powLimit = uint256S("0x00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // Match junkcoin-core
         consensus.nPowTargetTimespan = 4 * 60 * 60; // 4 hours - match junkcoin-core

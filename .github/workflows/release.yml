@@ -82,3 +82,73 @@ jobs:
           files: ${{ matrix.output_name }}.${{ matrix.archive_ext }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Native Apple Silicon / Intel macOS build via Homebrew (GUI + CLI).
+  # Produces CLI tarball; full .dmg packaging needs macdeployqt locally via package-macos.sh.
+  build-macos:
+    name: Build macOS
+    runs-on: macos-14
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+
+      - name: Install Homebrew dependencies
+        run: |
+          brew update
+          brew install automake libtool boost miniupnpc pkg-config python qt@5 libevent qrencode fmt berkeley-db@4 librsvg
+
+      - name: Configure and build
+        run: |
+          eval "$(/opt/homebrew/bin/brew shellenv)"
+          export PATH="/opt/homebrew/opt/qt@5/bin:$PATH"
+          ./autogen.sh
+          ./configure \
+            --enable-c++17 \
+            --with-gui=qt5 \
+            --disable-zmq \
+            --disable-tests \
+            --disable-bench \
+            --without-miniupnpc \
+            --with-boost="$(brew --prefix boost)" \
+            BDB_CFLAGS="-I$(brew --prefix berkeley-db@4)/include" \
+            BDB_LIBS="-L$(brew --prefix berkeley-db@4)/lib -ldb_cxx-4.8" \
+            CPPFLAGS="-I/opt/homebrew/include" \
+            LDFLAGS="-L/opt/homebrew/lib" \
+            PKG_CONFIG_PATH="$(brew --prefix qt@5)/lib/pkgconfig:$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix libevent)/lib/pkgconfig:$(brew --prefix fmt)/lib/pkgconfig" \
+            CXXFLAGS="-O2 -g -std=c++17" \
+            CFLAGS="-O2 -g"
+          make -j"$(sysctl -n hw.ncpu)"
+
+      - name: Package CLI tools
+        run: |
+          mkdir -p release-binaries
+          cp src/junkcoind src/junkcoin-cli src/junkcoin-tx src/junkcoin-wallet release-binaries/
+          cp src/qt/junkcoin-qt release-binaries/ || true
+          tar -czvf junkcoin-macos-arm64.tar.gz -C release-binaries .
+
+      - name: Package app/dmg (best-effort)
+        run: |
+          if [ -x ./package-macos.sh ] && [ -x src/qt/junkcoin-qt ]; then
+            ./package-macos.sh || true
+          fi
+          if [ -f Junkcoin-Qt.dmg ]; then
+            mv Junkcoin-Qt.dmg junkcoin-macos-arm64-qt.dmg
+          fi
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: junkcoin-macos-arm64
+          path: |
+            junkcoin-macos-arm64.tar.gz
+            junkcoin-macos-arm64-qt.dmg
+
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            junkcoin-macos-arm64.tar.gz
+            junkcoin-macos-arm64-qt.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

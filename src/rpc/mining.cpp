@@ -684,8 +684,7 @@ static RPCHelpMan getblocktemplate()
     const int nextHeight = pindexTip ? pindexTip->nHeight + 1 : 0;
     const Consensus::Params& consensus_params = Params().GetConsensus();
     const bool requireSegwitRule = nextHeight >= consensus_params.SegwitHeight;
-    const ThresholdState mwebState = VersionBitsState(pindexTip, consensus_params, Consensus::DEPLOYMENT_MWEB, versionbitscache);
-    const bool requireMwebRule = mwebState == ThresholdState::ACTIVE;
+    const bool requireMwebRule = nextHeight >= consensus_params.MWEBHeight;
 
     if (requireSegwitRule && setClientRules.count("segwit") != 1) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "getblocktemplate must be called with the segwit rule set once segwit is active");
