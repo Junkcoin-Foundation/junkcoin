@@ -154,7 +154,15 @@ void DoTest(const CScript& scriptPubKey, const CScript& scriptSig, const CScript
     int libconsensus_flags = flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL;
     if (libconsensus_flags == flags) {
         int expectedSuccessCode = expect ? 1 : 0;
-        if (flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_WITNESS) {
+        if (flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_TAPROOT) {
+            CDataStream spent_outputs_stream(SER_NETWORK, PROTOCOL_VERSION);
+            spent_outputs_stream << std::vector<CTxOut>{txCredit.vout[0]};
+            BOOST_CHECK_MESSAGE(bitcoinconsensus_verify_script_with_spent_outputs(
+                scriptPubKey.data(), scriptPubKey.size(),
+                reinterpret_cast<const unsigned char*>(&stream[0]), stream.size(),
+                reinterpret_cast<const unsigned char*>(&spent_outputs_stream[0]), spent_outputs_stream.size(),
+                0, libconsensus_flags, nullptr) == expectedSuccessCode, message);
+        } else if (flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_WITNESS) {
             BOOST_CHECK_MESSAGE(bitcoinconsensus_verify_script_with_amount(scriptPubKey.data(), scriptPubKey.size(), txCredit.vout[0].nValue, (const unsigned char*)&stream[0], stream.size(), 0, libconsensus_flags, nullptr) == expectedSuccessCode, message);
         } else {
             BOOST_CHECK_MESSAGE(bitcoinconsensus_verify_script_with_amount(scriptPubKey.data(), scriptPubKey.size(), 0, (const unsigned char*)&stream[0], stream.size(), 0, libconsensus_flags, nullptr) == expectedSuccessCode, message);

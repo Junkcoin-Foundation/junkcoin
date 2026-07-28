@@ -959,7 +959,17 @@ bool MemPoolAccept::PolicyScriptChecks(ATMPArgs& args, Workspace& ws, Precompute
 
     TxValidationState &state = args.m_state;
 
-    constexpr unsigned int scriptVerifyFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
+    // Junkcoin: SCRIPT_VERIFY_DISABLED_OPCODES_REENABLED relaxes consensus
+    // rules instead of tightening them, so it must not be baked into the
+    // static STANDARD_SCRIPT_VERIFY_FLAGS: policy has to stay at least as
+    // strict as consensus, or a miner could pull a mempool transaction into
+    // a block that consensus then rejects. Mirror the tip's consensus flag
+    // here so that, once activated, spends of re-enabled-opcode outputs can
+    // actually relay.
+    const CBlockIndex* tip = ::ChainActive().Tip();
+    unsigned int scriptVerifyFlags = STANDARD_SCRIPT_VERIFY_FLAGS |
+        (GetBlockScriptFlags(tip, args.m_chainparams.GetConsensus(tip->nHeight)) &
+         SCRIPT_VERIFY_DISABLED_OPCODES_REENABLED);
 
     // Check input scripts and signatures.
     // This is done last to help prevent CPU exhaustion denial-of-service attacks.
@@ -1003,7 +1013,7 @@ bool MemPoolAccept::ConsensusScriptChecks(ATMPArgs& args, Workspace& ws, Precomp
     // There is a similar check in CreateNewBlock() to prevent creating
     // invalid blocks (using TestBlockValidity), however allowing such
     // transactions into the mempool can be exploited as a DoS attack.
-    unsigned int currentBlockScriptVerifyFlags = GetBlockScriptFlags(::ChainActive().Tip(), chainparams.GetConsensus());
+    unsigned int currentBlockScriptVerifyFlags = GetBlockScriptFlags(::ChainActive().Tip(), chainparams.GetConsensus(::ChainActive().Tip()->nHeight));
     if (!CheckInputsFromMempoolAndCache(tx, state, m_view, m_pool, currentBlockScriptVerifyFlags, txdata)) {
         return error("%s: BUG! PLEASE REPORT THIS! CheckInputScripts failed against latest-block but not STANDARD flags %s, %s",
                 __func__, hash.ToString(), state.ToString());
@@ -2213,7 +2223,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
     }
 
     // Get the script flags for this block
-    unsigned int flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus());
+    unsigned int flags = GetBlockScriptFlags(pindex, chainparams.GetConsensus(pindex->nHeight));
 
     int64_t nTime2 = GetTimeMicros(); nTimeForks += nTime2 - nTime1;
     LogPrint(BCLog::BENCH, "    - Fork checks: %.2fms [%.2fs (%.2fms/blk)]\n", MILLI * (nTime2 - nTime1), nTimeForks * MICRO, nTimeForks * MILLI / nBlocksTotal);

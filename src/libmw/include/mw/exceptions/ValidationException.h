@@ -1,9 +1,7 @@
 #pragma once
 
-#include <mw/exceptions/LTCException.h>
+#include <mw/exceptions/JKCException.h>
 #include <mw/util/StringUtil.h>
-
-#define ThrowValidation(type) throw ValidationException(type, __FUNCTION__)
 
 enum class EConsensusError
 {
@@ -23,11 +21,13 @@ enum class EConsensusError
     BAD_STATE
 };
 
-class ValidationException : public LTCException
+#define ThrowValidation(type) throw ValidationException(type, __FUNCTION__)
+
+class ValidationException : public JKCException
 {
 public:
     ValidationException(const EConsensusError& type, const std::string& function)
-        : LTCException("ValidationException", GetMessage(type), function)
+        : JKCException("ValidationException", GetMessage(type), function)
     {
 
     }

@@ -16,9 +16,17 @@
 #include <key_io.h>
 
 #include <assert.h>
+#include <stdexcept>
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
+
+static void ValidateOpcodeActivationOrdering(const Consensus::Params& consensus)
+{
+    if (consensus.TaprootHeight < consensus.DisabledScriptReactivationHeight) {
+        throw std::runtime_error("TaprootHeight must not precede DisabledScriptReactivationHeight");
+    }
+}
 
 static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesisOutputScript, uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
 {
@@ -81,6 +89,7 @@ public:
         consensus.TaprootHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
         // Junkcoin: Re-enable legacy disabled opcodes (OP_CAT, OP_MUL, etc.)
         consensus.DisabledScriptReactivationHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
+        ValidateOpcodeActivationOrdering(consensus);
         // Junkcoin: MWEB disabled
         consensus.MWEBHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
         consensus.MinBIP9WarningHeight = 10080 + 10080; // miner confirmation window
@@ -276,6 +285,7 @@ public:
         consensus.SegwitHeight = 140000;   // Activate SegWit at block 140,000 (+20k)
         consensus.TaprootHeight = 160000;  // Activate Taproot at block 160,000 (+20k)
         consensus.DisabledScriptReactivationHeight = 160000; // Re-enable opcodes (OP_CAT, OP_MUL, etc.) (+20k)
+        ValidateOpcodeActivationOrdering(consensus);
         consensus.MWEBHeight = 180000;     // Activate MWEB at block 180,000 (+20k)
         consensus.MinBIP9WarningHeight = 111440;
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
@@ -437,6 +447,7 @@ public:
         consensus.SegwitHeight = 0;
         consensus.TaprootHeight = 0;
         consensus.DisabledScriptReactivationHeight = 0;
+        ValidateOpcodeActivationOrdering(consensus);
         consensus.MWEBHeight = 0;
         consensus.MinBIP9WarningHeight = 0;
         consensus.powLimit = uint256S("0x00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // Match junkcoin-core
