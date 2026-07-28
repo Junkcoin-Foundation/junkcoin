@@ -1880,9 +1880,14 @@ bool AppInitMain(const util::Ref& context, NodeContext& node, interfaces::BlockA
         // Advertise witness capabilities.
         // The option to not set NODE_WITNESS is only used in the tests and should be removed.
         nLocalServices = ServiceFlags(nLocalServices | NODE_WITNESS);
+    }
 
-        // NODE_MWEB requires NODE_WITNESS, so we shouldn't signal for NODE_MWEB without NODE_WITNESS
-        nLocalServices = ServiceFlags(nLocalServices | NODE_MWEB | NODE_MWEB_LIGHT_CLIENT);
+    // Junkcoin: Gate MWEB service flags on MWEB activation (independent of SegWit)
+    if (chainparams.GetConsensus().MWEBHeight != std::numeric_limits<int>::max()) {
+        // NODE_MWEB requires NODE_WITNESS, so only signal if witness is also active
+        if (chainparams.GetConsensus().SegwitHeight != std::numeric_limits<int>::max()) {
+            nLocalServices = ServiceFlags(nLocalServices | NODE_MWEB | NODE_MWEB_LIGHT_CLIENT);
+        }
     }
 
     // ********************************************************* Step 11: import blocks

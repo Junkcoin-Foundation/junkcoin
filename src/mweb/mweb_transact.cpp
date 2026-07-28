@@ -30,7 +30,7 @@ TxType MWEB::GetTxType(const std::vector<CRecipient>& recipients, const std::set
         if (std::any_of(input_coins.cbegin(), input_coins.cend(), is_mweb)) {
             return TxType::PEGOUT;
         } else {
-            return TxType::LTC_TO_LTC;
+            return TxType::JKC_TO_JKC;
         }
     }
 }
@@ -75,7 +75,7 @@ uint64_t MWEB::CalcMWEBWeight(const MWEB::TxType& mweb_type, const bool change_o
         mweb_weight += mw::STANDARD_OUTPUT_WEIGHT;
     }
 
-    if (mweb_type != MWEB::TxType::LTC_TO_LTC) {
+    if (mweb_type != MWEB::TxType::JKC_TO_JKC) {
         CScript pegout_script = (mweb_type == MWEB::TxType::PEGOUT) ? recipients.front().GetScript() : CScript();
         mweb_weight += Weight::CalcKernelWeight(true, pegout_script);
     }

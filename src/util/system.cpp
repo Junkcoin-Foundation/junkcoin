@@ -1285,10 +1285,10 @@ std::string CopyrightHolders(const std::string& strPrefix)
     std::string strCopyrightHolders = strPrefix + copyright_devs;
 
     // Credit upstream projects
-    const std::string litecoinLine = strprintf(_("Copyright (C) %i-%i").translated, 2011, COPYRIGHT_YEAR) + " " + _("The Litecoin Core developers").translated;
+    const std::string litecoinLine = strprintf(_("Copyright (C) %i-%i").translated, 2011, COPYRIGHT_YEAR) + " " + _("The Litecoin Core developers (Junkcoin fork)").translated;
     strCopyrightHolders += "\n" + litecoinLine;
 
-    const std::string bitcoinLine = strprintf(_("Copyright (C) %i-%i").translated, 2009, COPYRIGHT_YEAR) + " " + _("The Bitcoin Core developers").translated;
+    const std::string bitcoinLine = strprintf(_("Copyright (C) %i-%i").translated, 2009, COPYRIGHT_YEAR) + " " + _("The Bitcoin Core developers (Junkcoin fork)").translated;
     strCopyrightHolders += "\n" + bitcoinLine;
 
     return strCopyrightHolders;

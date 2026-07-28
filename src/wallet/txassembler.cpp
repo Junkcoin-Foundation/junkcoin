@@ -217,7 +217,7 @@ void TxAssembler::CreateTransaction_Locked(
     AddTxInputs(new_tx);
 
     // Now build the MWEB side of the transaction
-    if (new_tx.mweb_type != MWEB::TxType::LTC_TO_LTC) {
+    if (new_tx.mweb_type != MWEB::TxType::JKC_TO_JKC) {
         MWEB::Transact(m_wallet).AddMWEBTx(new_tx);
     }
 
@@ -461,7 +461,7 @@ bool TxAssembler::AttemptCoinSelection(InProcessTx& new_tx, const CAmount& nTarg
     } else {
         // First try to construct a JKC-to-JKC transaction
         CoinSelectionParams mweb_to_mweb = new_tx.coin_selection_params;
-        mweb_to_mweb.input_preference = InputPreference::LTC_ONLY;
+        mweb_to_mweb.input_preference = InputPreference::NON_MWEB_ONLY;
         mweb_to_mweb.mweb_change_output_weight = 0;
         mweb_to_mweb.mweb_nochange_weight = 0;
 

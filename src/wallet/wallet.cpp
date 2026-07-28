@@ -4164,8 +4164,15 @@ bool CWallet::UpgradeWallet(int version, bilingual_str& error)
 {
     int prev_version = GetVersion();
     if (version == 0) {
-        WalletLogPrintf("Performing wallet upgrade to %i\n", FEATURE_LATEST);
-        version = FEATURE_LATEST;
+        // Junkcoin: If MWEB is disabled on this network, cap upgrade to PRE_SPLIT_KEYPOOL
+        const auto& consensus = Params().GetConsensus();
+        if (consensus.MWEBHeight == std::numeric_limits<int>::max()) {
+            version = FEATURE_PRE_SPLIT_KEYPOOL;
+            WalletLogPrintf("Performing wallet upgrade to %i (MWEB disabled on this network)\n", version);
+        } else {
+            WalletLogPrintf("Performing wallet upgrade to %i\n", FEATURE_LATEST);
+            version = FEATURE_LATEST;
+        }
     } else {
         WalletLogPrintf("Allowing wallet upgrade up to %i\n", version);
     }
@@ -4181,6 +4188,15 @@ bool CWallet::UpgradeWallet(int version, bilingual_str& error)
     if (!CanSupportFeature(FEATURE_HD_SPLIT) && version >= FEATURE_HD_SPLIT && version < FEATURE_PRE_SPLIT_KEYPOOL) {
         error = _("Cannot upgrade a non HD split wallet without upgrading to support pre split keypool. Please use version 169900 or no version specified.");
         return false;
+    }
+
+    // Junkcoin: Block MWEB upgrade if MWEB is disabled on this network
+    if (version >= FEATURE_MWEB) {
+        const auto& consensus = Params().GetConsensus();
+        if (consensus.MWEBHeight == std::numeric_limits<int>::max()) {
+            error = _("Cannot upgrade wallet to MWEB version: MWEB is not enabled on this network");
+            return false;
+        }
     }
 
     // Permanently upgrade to the version
