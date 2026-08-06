@@ -1446,7 +1446,11 @@ static UniValue AuxMiningCreateBlock(const CScript& scriptPubKey, const CTxMemPo
     result.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue);
     result.pushKV("bits", strprintf("%08x", pblock->nBits));
     result.pushKV("height", static_cast<int64_t>(pindexPrev->nHeight + 1));
-    result.pushKV("target", ArithToUint256(target).GetHex());
+    // Emit the target in raw little-endian byte order, matching dogecoin and
+    // namecoin. GetHex() would reverse it into big-endian display order, which
+    // aux-pow miners then byte-swap a second time and misread the difficulty.
+    const uint256 targetLittleEndian = ArithToUint256(target);
+    result.pushKV("target", HexStr(targetLittleEndian));
 
     return result;
 }
