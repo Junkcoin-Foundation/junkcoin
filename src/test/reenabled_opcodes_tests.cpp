@@ -315,6 +315,26 @@ BOOST_AUTO_TEST_CASE(arithmetic_overflow_rejected)
     const CScript mul_ok = CScript() << CScriptNum(30000) << CScriptNum(7) << OP_MUL;
     BOOST_CHECK(Eval(mul_ok, REENABLED, err, stack));
     BOOST_CHECK(stack.back() == CScriptNum(210000).getvch());
+
+    // Exact boundary: ±nMaxScriptNumValue (0x7fffffff) must be accepted.
+    stack.clear();
+    const CScript mul_pos_boundary = CScript() << CScriptNum(0x7fffffff) << CScriptNum(1) << OP_MUL;
+    BOOST_CHECK(Eval(mul_pos_boundary, REENABLED, err, stack));
+    BOOST_CHECK(stack.back() == CScriptNum(0x7fffffff).getvch());
+
+    stack.clear();
+    const CScript mul_neg_boundary = CScript() << CScriptNum(-0x7fffffff) << CScriptNum(1) << OP_MUL;
+    BOOST_CHECK(Eval(mul_neg_boundary, REENABLED, err, stack));
+    BOOST_CHECK(stack.back() == CScriptNum(-0x7fffffff).getvch());
+
+    // One past the boundary must fail.
+    const CScript mul_pos_past = CScript() << CScriptNum(0x40000000) << CScriptNum(2) << OP_MUL;
+    BOOST_CHECK(!EvalOk(mul_pos_past, REENABLED, err));
+    BOOST_CHECK_EQUAL(err, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+    const CScript mul_neg_past = CScript() << CScriptNum(-0x40000000) << CScriptNum(2) << OP_MUL;
+    BOOST_CHECK(!EvalOk(mul_neg_past, REENABLED, err));
+    BOOST_CHECK_EQUAL(err, SCRIPT_ERR_INVALID_STACK_OPERATION);
 }
 
 // ---------------------------------------------------------------------------
@@ -361,4 +381,92 @@ BOOST_AUTO_TEST_CASE(div_mod_by_zero_rejected)
     }
 }
 
+// ---------------------------------------------------------------------------
+// OP_LEFT / OP_RIGHT / OP_INVERT semantics
+// ---------------------------------------------------------------------------
+
+BOOST_AUTO_TEST_CASE(op_left_semantics)
+{
+    ScriptError err;
+    const std::vector<unsigned char> data{0x11, 0x22, 0x33, 0x44};
+    std::vector<std::vector<unsigned char>> stack;
+
+    // Take left 2 bytes.
+    const CScript left2 = CScript() << data << CScriptNum(2) << OP_LEFT;
+    BOOST_CHECK(Eval(left2, REENABLED, err, stack));
+    BOOST_CHECK(stack.back() == std::vector<unsigned char>({0x11, 0x22}));
+
+    // Clamping: nSize > data length returns the whole input.
+    stack.clear();
+    const CScript left_clamp = CScript() << data << CScriptNum(100) << OP_LEFT;
+    BOOST_CHECK(Eval(left_clamp, REENABLED, err, stack));
+    BOOST_CHECK(stack.back() == data);
+
+    // Zero length returns empty.
+    stack.clear();
+    const CScript left_zero = CScript() << data << CScriptNum(0) << OP_LEFT;
+    BOOST_CHECK(Eval(left_zero, REENABLED, err, stack));
+    BOOST_CHECK(stack.back().empty());
+
+    // Negative size is rejected.
+    const CScript left_neg = CScript() << data << CScriptNum(-1) << OP_LEFT;
+    BOOST_CHECK(!EvalOk(left_neg, REENABLED, err));
+    BOOST_CHECK_EQUAL(err, SCRIPT_ERR_INVALID_STACK_OPERATION);
+}
+
+BOOST_AUTO_TEST_CASE(op_right_semantics)
+{
+    ScriptError err;
+    const std::vector<unsigned char> data{0x11, 0x22, 0x33, 0x44};
+    std::vector<std::vector<unsigned char>> stack;
+
+    // Take right 2 bytes.
+    const CScript right2 = CScript() << data << CScriptNum(2) << OP_RIGHT;
+    BOOST_CHECK(Eval(right2, REENABLED, err, stack));
+    BOOST_CHECK(stack.back() == std::vector<unsigned char>({0x33, 0x44}));
+
+    // Clamping: nSize > data length returns the whole input.
+    stack.clear();
+    const CScript right_clamp = CScript() << data << CScriptNum(100) << OP_RIGHT;
+    BOOST_CHECK(Eval(right_clamp, REENABLED, err, stack));
+    BOOST_CHECK(stack.back() == data);
+
+    // Zero length returns empty.
+    stack.clear();
+    const CScript right_zero = CScript() << data << CScriptNum(0) << OP_RIGHT;
+    BOOST_CHECK(Eval(right_zero, REENABLED, err, stack));
+    BOOST_CHECK(stack.back().empty());
+
+    // Negative size is rejected.
+    const CScript right_neg = CScript() << data << CScriptNum(-1) << OP_RIGHT;
+    BOOST_CHECK(!EvalOk(right_neg, REENABLED, err));
+    BOOST_CHECK_EQUAL(err, SCRIPT_ERR_INVALID_STACK_OPERATION);
+}
+
+BOOST_AUTO_TEST_CASE(op_invert_semantics)
+{
+    ScriptError err;
+    std::vector<std::vector<unsigned char>> stack;
+
+    // Invert flips all bits.
+    const std::vector<unsigned char> input{0x0f, 0xf0, 0x00, 0xff};
+    const CScript invert_script = CScript() << input << OP_INVERT;
+    BOOST_CHECK(Eval(invert_script, REENABLED, err, stack));
+    BOOST_CHECK(stack.back() == std::vector<unsigned char>({0xf0, 0x0f, 0xff, 0x00}));
+
+    // Double-invert yields the original.
+    stack.clear();
+    const CScript double_invert = CScript() << input << OP_INVERT << OP_INVERT;
+    BOOST_CHECK(Eval(double_invert, REENABLED, err, stack));
+    BOOST_CHECK(stack.back() == input);
+
+    // Invert on empty element.
+    stack.clear();
+    const std::vector<unsigned char> empty{};
+    const CScript invert_empty = CScript() << empty << OP_INVERT;
+    BOOST_CHECK(Eval(invert_empty, REENABLED, err, stack));
+    BOOST_CHECK(stack.back().empty());
+}
+
 BOOST_AUTO_TEST_SUITE_END()
+
