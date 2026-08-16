@@ -82,6 +82,10 @@ struct Params {
     /** Block height at which MWEB becomes active.
      * Set to std::numeric_limits<int>::max() to disable. */
     int MWEBHeight;
+    /** MWEB kernels signaling pegouts must contain at least one pegout at and after this height. */
+    int mweb_pegout_feature_activation_height{0};
+    /** MWEB kernels signaling extra data must contain non-empty extra data at and after this height. */
+    int mweb_extradata_feature_activation_height{0};
     /** Block height at which legacy disabled opcodes (OP_CAT, OP_MUL, etc.) are re-enabled. */
     int DisabledScriptReactivationHeight;
     /** Don't warn about unknown BIP 9 activations below this height.

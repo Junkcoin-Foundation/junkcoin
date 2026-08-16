@@ -92,6 +92,8 @@ public:
         ValidateOpcodeActivationOrdering(consensus);
         // Junkcoin: MWEB disabled
         consensus.MWEBHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
+        consensus.mweb_pegout_feature_activation_height = consensus.MWEBHeight;
+        consensus.mweb_extradata_feature_activation_height = consensus.MWEBHeight;
         consensus.MinBIP9WarningHeight = 10080 + 10080; // miner confirmation window
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 24 * 60 * 60; // 1 day
@@ -287,6 +289,8 @@ public:
         consensus.DisabledScriptReactivationHeight = 160000; // Re-enable opcodes (OP_CAT, OP_MUL, etc.) (+20k)
         ValidateOpcodeActivationOrdering(consensus);
         consensus.MWEBHeight = 180000;     // Activate MWEB at block 180,000 (+20k)
+        consensus.mweb_pegout_feature_activation_height = consensus.MWEBHeight;
+        consensus.mweb_extradata_feature_activation_height = consensus.MWEBHeight;
         consensus.MinBIP9WarningHeight = 111440;
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.nPowTargetTimespan = 4 * 60 * 60; // 4H - match junkcoin-core
@@ -449,6 +453,8 @@ public:
         consensus.DisabledScriptReactivationHeight = 0;
         ValidateOpcodeActivationOrdering(consensus);
         consensus.MWEBHeight = 0;
+        consensus.mweb_pegout_feature_activation_height = 0;
+        consensus.mweb_extradata_feature_activation_height = 0;
         consensus.MinBIP9WarningHeight = 0;
         consensus.powLimit = uint256S("0x00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // Match junkcoin-core
         consensus.nPowTargetTimespan = 4 * 60 * 60; // 4 hours - match junkcoin-core

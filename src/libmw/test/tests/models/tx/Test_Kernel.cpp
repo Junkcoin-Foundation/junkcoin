@@ -5,9 +5,27 @@
 #include <mw/crypto/Schnorr.h>
 #include <mw/models/tx/Kernel.h>
 
+#include <chainparams.h>
 #include <test_framework/TestMWEB.h>
 
+#include <limits>
+
 BOOST_FIXTURE_TEST_SUITE(TestKernel, MWEBTestingSetup)
+
+BOOST_AUTO_TEST_CASE(FeatureActivationHeights_Test)
+{
+    const auto main_params = CreateChainParams(*m_node.args, CBaseChainParams::MAIN);
+    BOOST_REQUIRE_EQUAL(main_params->GetConsensus().mweb_pegout_feature_activation_height, std::numeric_limits<int>::max());
+    BOOST_REQUIRE_EQUAL(main_params->GetConsensus().mweb_extradata_feature_activation_height, std::numeric_limits<int>::max());
+
+    const auto testnet_params = CreateChainParams(*m_node.args, CBaseChainParams::TESTNET);
+    BOOST_REQUIRE_EQUAL(testnet_params->GetConsensus().mweb_pegout_feature_activation_height, 180000);
+    BOOST_REQUIRE_EQUAL(testnet_params->GetConsensus().mweb_extradata_feature_activation_height, 180000);
+
+    const auto regtest_params = CreateChainParams(*m_node.args, CBaseChainParams::REGTEST);
+    BOOST_REQUIRE_EQUAL(regtest_params->GetConsensus().mweb_pegout_feature_activation_height, 0);
+    BOOST_REQUIRE_EQUAL(regtest_params->GetConsensus().mweb_extradata_feature_activation_height, 0);
+}
 
 BOOST_AUTO_TEST_CASE(PlainKernel_Test)
 {
@@ -97,9 +115,25 @@ BOOST_AUTO_TEST_CASE(NonStandardKernel_Test)
         standard_kernel.GetSignature()
     );
 
+    Kernel nonstandard_kernel3(
+        Kernel::PEGOUT_FEATURE_BIT,
+        boost::none,
+        boost::none,
+        std::vector<PegOutCoin>{},
+        boost::none,
+        boost::none,
+        std::vector<uint8_t>{},
+        standard_kernel.GetCommitment(),
+        standard_kernel.GetSignature()
+    );
+
     BOOST_REQUIRE(standard_kernel.IsStandard());
     BOOST_REQUIRE(!nonstandard_kernel1.IsStandard());
     BOOST_REQUIRE(!nonstandard_kernel2.IsStandard());
+    BOOST_REQUIRE(!nonstandard_kernel3.IsStandard());
+    BOOST_REQUIRE(nonstandard_kernel1.HasCanonicalExtraDataFeature());
+    BOOST_REQUIRE(!nonstandard_kernel2.HasCanonicalExtraDataFeature());
+    BOOST_REQUIRE(!nonstandard_kernel3.HasCanonicalPegOutFeature());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
