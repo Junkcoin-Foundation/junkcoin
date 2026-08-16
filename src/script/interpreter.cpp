@@ -1170,7 +1170,7 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
                             return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         {
                             const int64_t nResult = int64_t(bn1.getint()) << bn2.getint();
-                            if (nResult > nMaxScriptNumValue)
+                            if (nResult > nMaxScriptNumValue || nResult < -nMaxScriptNumValue)
                                 return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                             bn = CScriptNum(nResult);
                         }
