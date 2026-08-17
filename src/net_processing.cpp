@@ -1128,8 +1128,15 @@ bool PeerManager::MaybePunishNodeForBlock(NodeId nodeid, const BlockValidationSt
     case BlockValidationResult::BLOCK_RESULT_UNSET:
         break;
     // The node is providing invalid data:
-    case BlockValidationResult::BLOCK_CONSENSUS:
     case BlockValidationResult::BLOCK_MUTATED:
+        // Compact-block relays may not have checked the full body, but MWEB
+        // data is not committed by the header and can otherwise be replayed.
+        if (!via_compact_block || state.GetRejectReason() == "bad-blk-mweb") {
+            Misbehaving(nodeid, 100, message);
+            return true;
+        }
+        break;
+    case BlockValidationResult::BLOCK_CONSENSUS:
         if (!via_compact_block) {
             Misbehaving(nodeid, 100, message);
             return true;
