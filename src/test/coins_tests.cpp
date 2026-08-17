@@ -516,6 +516,29 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
     g_mock_deterministic_tests = false;
 }
 
+BOOST_AUTO_TEST_CASE(txinundo_serialization)
+{
+    CTxUndo undo;
+    undo.vprevout.emplace_back(CTxOut(1, CScript()), 100, false, true);
+    undo.vprevout.emplace_back(CTxOut(2, CScript()), 101, true, false);
+
+    CDataStream stream(SER_DISK, CLIENT_VERSION);
+    stream << undo;
+
+    CTxUndo deserialized;
+    stream >> deserialized;
+
+    BOOST_REQUIRE_EQUAL(deserialized.vprevout.size(), 2U);
+    BOOST_CHECK_EQUAL(deserialized.vprevout[0].nHeight, 100U);
+    BOOST_CHECK(!deserialized.vprevout[0].fCoinBase);
+    BOOST_CHECK(deserialized.vprevout[0].fPegout);
+    BOOST_CHECK_EQUAL(deserialized.vprevout[0].out.nValue, 1);
+    BOOST_CHECK_EQUAL(deserialized.vprevout[1].nHeight, 101U);
+    BOOST_CHECK(deserialized.vprevout[1].fCoinBase);
+    BOOST_CHECK(!deserialized.vprevout[1].fPegout);
+    BOOST_CHECK_EQUAL(deserialized.vprevout[1].out.nValue, 2);
+}
+
 BOOST_AUTO_TEST_CASE(ccoins_serialization)
 {
     // Good example
