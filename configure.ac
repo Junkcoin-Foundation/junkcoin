@@ -870,8 +870,18 @@ dnl "ad_strip" as the symbol for the entry point.
 if test x$TARGET_OS = xdarwin; then
   AX_CHECK_LINK_FLAG([[-Wl,-dead_strip]], [LDFLAGS="$LDFLAGS -Wl,-dead_strip"],, [[$LDFLAG_WERROR]])
   AX_CHECK_LINK_FLAG([[-Wl,-dead_strip_dylibs]], [LDFLAGS="$LDFLAGS -Wl,-dead_strip_dylibs"],, [[$LDFLAG_WERROR]])
-  AX_CHECK_LINK_FLAG([[-Wl,-bind_at_load]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,-bind_at_load"],, [[$LDFLAG_WERROR]])
 fi
+
+dnl An old hack similar to a98356fee to remove hard-coded
+dnl bind_at_load flag from libtool
+case $host in
+  *darwin*)
+     AC_MSG_RESULT([Removing -Wl,bind_at_load from libtool.])
+     sed < libtool > libtool-2 '/bind_at_load/d'
+     mv libtool-2 libtool
+     chmod 755 libtool
+   ;;
+esac
 
 if test x$enable_determinism = xyes; then
   if test x$TARGET_OS = xwindows; then
