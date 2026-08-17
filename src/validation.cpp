@@ -2800,7 +2800,7 @@ bool CChainState::ConnectTip(BlockValidationState& state, const CChainParams& ch
                 if (state.GetResult() == BlockValidationResult::BLOCK_MUTATED) {
                     // The same block hash may be valid with different
                     // non-committed data, so do not retain these bytes.
-                    EraseBlockData(pindexNew);
+                    EraseBlockData(pindexNew, /*preserve_tx_metadata=*/true);
                 }
             }
             return error("%s: ConnectBlock %s failed, %s", __func__, pindexNew->GetBlockHash().ToString(), state.ToString());
@@ -3437,6 +3437,7 @@ void CChainState::ReceivedBlockTransactions(const CBlock& block, CBlockIndex* pi
     pindexNew->nFile = pos.nFile;
     pindexNew->nDataPos = pos.nPos;
     pindexNew->nUndoPos = 0;
+    pindexNew->nStatus &= ~BLOCK_DISCARDED_MUTATED_DATA;
     pindexNew->nStatus |= BLOCK_HAVE_DATA;
     if (IsWitnessEnabled(pindexNew->pprev, consensusParams)) {
         pindexNew->nStatus |= BLOCK_OPT_WITNESS;
@@ -4752,23 +4753,29 @@ bool CChainState::ReplayBlocks(const CChainParams& params)
 }
 
 //! Helper for CChainState::RewindBlockIndex
-void CChainState::EraseBlockData(CBlockIndex* index)
+void CChainState::EraseBlockData(CBlockIndex* index, bool preserve_tx_metadata)
 {
     AssertLockHeld(cs_main);
     assert(!m_chain.Contains(index)); // Make sure this block isn't active
 
-    // Reduce validity
-    index->nStatus = std::min<unsigned int>(index->nStatus & BLOCK_VALID_MASK, BLOCK_VALID_TREE) | (index->nStatus & ~BLOCK_VALID_MASK);
+    if (preserve_tx_metadata) {
+        // Keep descendants linked; only the mutable serialization must be replaced.
+        index->nStatus |= BLOCK_DISCARDED_MUTATED_DATA;
+    } else {
+        // Reduce validity
+        index->nStatus = std::min<unsigned int>(index->nStatus & BLOCK_VALID_MASK, BLOCK_VALID_TREE) | (index->nStatus & ~BLOCK_VALID_MASK);
+        index->nStatus &= ~BLOCK_DISCARDED_MUTATED_DATA;
+        // Remove various other things
+        index->nTx = 0;
+        index->nChainTx = 0;
+        index->nSequenceId = 0;
+    }
     // Remove have-data flags.
     index->nStatus &= ~(BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO);
     // Remove storage location.
     index->nFile = 0;
     index->nDataPos = 0;
     index->nUndoPos = 0;
-    // Remove various other things
-    index->nTx = 0;
-    index->nChainTx = 0;
-    index->nSequenceId = 0;
     // Make sure it gets written.
     setDirtyBlockIndex.insert(index);
     // Update indexes
@@ -5149,14 +5156,21 @@ void CChainState::CheckBlockIndex(const Consensus::Params& consensusParams)
         // VALID_TRANSACTIONS is equivalent to nTx > 0 for all nodes (whether or not pruning has occurred).
         // HAVE_DATA is only equivalent to nTx > 0 (or VALID_TRANSACTIONS) if no pruning has occurred.
         if (!fHavePruned) {
-            // If we've never pruned, then HAVE_DATA should be equivalent to nTx > 0
-            assert(!(pindex->nStatus & BLOCK_HAVE_DATA) == (pindex->nTx == 0));
-            assert(pindexFirstMissing == pindexFirstNeverProcessed);
+            // Transaction metadata implies either available data or an
+            // explicitly discarded mutated serialization.
+            assert(((pindex->nStatus & BLOCK_HAVE_DATA) != 0 ||
+                    (pindex->nStatus & BLOCK_DISCARDED_MUTATED_DATA) != 0) == (pindex->nTx > 0));
+            assert(pindexFirstMissing == pindexFirstNeverProcessed ||
+                   (pindexFirstMissing && (pindexFirstMissing->nStatus & BLOCK_DISCARDED_MUTATED_DATA)));
         } else {
             // If we have pruned, then we can only say that HAVE_DATA implies nTx > 0
             if (pindex->nStatus & BLOCK_HAVE_DATA) assert(pindex->nTx > 0);
         }
         if (pindex->nStatus & BLOCK_HAVE_UNDO) assert(pindex->nStatus & BLOCK_HAVE_DATA);
+        if (pindex->nStatus & BLOCK_DISCARDED_MUTATED_DATA) {
+            assert(!(pindex->nStatus & BLOCK_HAVE_DATA));
+            assert(pindex->nTx > 0);
+        }
         assert(((pindex->nStatus & BLOCK_VALID_MASK) >= BLOCK_VALID_TRANSACTIONS) == (pindex->nTx > 0)); // This is pruning-independent.
         // All parents having had data (at some point) is equivalent to all parents being VALID_TRANSACTIONS, which is equivalent to HaveTxsDownloaded().
         assert((pindexFirstNeverProcessed == nullptr) == pindex->HaveTxsDownloaded());
@@ -5207,7 +5221,7 @@ void CChainState::CheckBlockIndex(const Consensus::Params& consensusParams)
         if (pindexFirstMissing == nullptr) assert(!foundInUnlinked); // We aren't missing data for any parent -- cannot be in m_blocks_unlinked.
         if (pindex->pprev && (pindex->nStatus & BLOCK_HAVE_DATA) && pindexFirstNeverProcessed == nullptr && pindexFirstMissing != nullptr) {
             // We HAVE_DATA for this block, have received data for all parents at some point, but we're currently missing data for some parent.
-            assert(fHavePruned); // We must have pruned.
+            assert(fHavePruned || (pindexFirstMissing->nStatus & BLOCK_DISCARDED_MUTATED_DATA)); // We must have pruned or discarded mutated data.
             // This block may have entered m_blocks_unlinked if:
             //  - it has a descendant that at some point had more work than the
             //    tip, and
