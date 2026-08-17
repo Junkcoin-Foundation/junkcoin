@@ -107,6 +107,9 @@ static const int MAX_BLOCKTXN_DEPTH = 10;
 static const int MAX_MWEB_LEAFSET_DEPTH = 10;
 /** Maximum number of MWEB UTXOs that can be requested in a batch. */
 static const uint16_t MAX_REQUESTED_MWEB_UTXOS = 4096;
+/** Node-wide budget for expensive MWEB leafset/UTXO serving requests. */
+static constexpr double MWEB_SERVE_MAX_TOKENS{32.0};
+static constexpr double MWEB_SERVE_REFILL_PER_SECOND{0.5};
 /** Size of the "block download window": how far ahead of our current height do we fetch?
  *  Larger windows tolerate larger download speed differences between peer, but increase the potential
  *  degree of disordering of blocks on disk (which make reindexing and pruning harder). We'll probably
@@ -1739,6 +1742,31 @@ struct MWEBLeafsetMsg
     BitSet leafset;
 };
 
+static bool AllowMWEBServe(CNode& pfrom) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+{
+    if (pfrom.HasPermission(PF_NOBAN)) {
+        return true;
+    }
+
+    // This state is node-wide so reconnecting cannot reset the allowance.
+    static double node_tokens{MWEB_SERVE_MAX_TOKENS};
+    static std::chrono::microseconds node_timestamp{GetTime<std::chrono::microseconds>()};
+
+    const auto now = GetTime<std::chrono::microseconds>();
+    const auto time_diff = std::max(now - node_timestamp, std::chrono::microseconds{0});
+    node_tokens = std::min<double>(
+        node_tokens + Ticks<SecondsDouble>(time_diff) * MWEB_SERVE_REFILL_PER_SECOND,
+        MWEB_SERVE_MAX_TOKENS);
+    node_timestamp = now;
+
+    if (node_tokens < 1.0) {
+        return false;
+    }
+
+    node_tokens -= 1.0;
+    return true;
+}
+
 static void ProcessGetMWEBLeafset(CNode& pfrom, const ChainstateManager& chainman, const CChainParams& chainparams, const CInv& inv, CConnman& connman)
 {
     ActivateBestChainIfNeeded(chainparams, inv);
@@ -1754,8 +1782,6 @@ static void ProcessGetMWEBLeafset(CNode& pfrom, const ChainstateManager& chainma
         LogPrint(BCLog::NET, "Ignoring mweb leafset request from peer=%d because requested block hash is not in active chain\n", pfrom.GetId());
         return;
     }
-
-    // TODO: Add an outbound limit
 
     // For performance reasons, we limit how many blocks can be undone in order to rebuild the leafset
     if (chainman.ActiveChain().Tip()->nHeight - pindex->nHeight > MAX_MWEB_LEAFSET_DEPTH) {
@@ -1776,6 +1802,11 @@ static void ProcessGetMWEBLeafset(CNode& pfrom, const ChainstateManager& chainma
         if (!pfrom.HasPermission(PF_NOBAN)) {
             pfrom.fDisconnect = true;
         }
+        return;
+    }
+
+    if (!AllowMWEBServe(pfrom)) {
+        LogPrint(BCLog::NET, "Rate-limiting mweb leafset request from peer=%d\n", pfrom.GetId());
         return;
     }
 
@@ -1858,8 +1889,6 @@ static void ProcessGetMWEBUTXOs(CNode& pfrom, const ChainstateManager& chainman,
         return;
     }
 
-    // TODO: Add an outbound limit
-
     // For performance reasons, we limit how many blocks can be undone in order to rebuild the leafset
     if (chainman.ActiveChain().Tip()->nHeight - pindex->nHeight > MAX_MWEB_LEAFSET_DEPTH) {
         LogPrint(BCLog::NET, "Ignore getmwebutxos below MAX_MWEB_LEAFSET_DEPTH threshold from peer=%d\n", pfrom.GetId());
@@ -1878,6 +1907,11 @@ static void ProcessGetMWEBUTXOs(CNode& pfrom, const ChainstateManager& chainman,
         if (!pfrom.HasPermission(PF_NOBAN)) {
             pfrom.fDisconnect = true;
         }
+        return;
+    }
+
+    if (!AllowMWEBServe(pfrom)) {
+        LogPrint(BCLog::NET, "Rate-limiting getmwebutxos request from peer=%d\n", pfrom.GetId());
         return;
     }
 
