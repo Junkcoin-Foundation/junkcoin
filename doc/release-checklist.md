@@ -27,6 +27,22 @@ through this checklist top to bottom and tick every box before publishing.
 - [ ] Effect on old nodes is documented: hardfork (old nodes fork off) vs
       softfork (old nodes keep validating) — written in the release notes.
 
+### v4.0.2 — consensus change to document in release notes
+
+- [ ] **Kernel feature-payload rule** (commit `9b1222669`, backport of
+      litecoin `1db3fd05f`): blocks containing kernels with the
+      `PEGOUT_FEATURE_BIT` or `EXTRA_DATA_FEATURE_BIT` set but an **empty
+      payload** are rejected. Activates together with MWEB itself
+      (`mweb_pegout_feature_activation_height` = `mweb_extradata_feature_activation_height`
+      = `MWEBHeight`): testnet **180,000**, mainnet **disabled**
+      (`INT_MAX`), regtest 0.
+- [ ] Effect on old nodes: before the activation height behavior is
+      identical (no fork). At testnet height 180,000 an old node would
+      accept such kernels while a new node rejects them — **all nodes must
+      run v4.0.2+ before testnet 180,000**. Mainnet is unaffected.
+- [ ] Release notes must state: "opcode re-activation rules (OP_CAT, OP_MUL,
+      etc. at testnet 160,000) and MWEB kernel rules (180,000) are final."
+
 ## 2. Code freeze & testing
 
 - [ ] `make -j$(nproc) && make check` green on the release branch.
