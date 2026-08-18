@@ -152,7 +152,7 @@ def create_non_hd_wallet(chain, options):
     data_dir = get_datadir_path(options.tmpdir, 10)
 
     # adjust conf for pre 17
-    conf_file = os.path.join(data_dir, 'litecoin.conf')
+    conf_file = os.path.join(data_dir, 'junkcoin.conf')
     with open(conf_file, 'r', encoding='utf8') as conf:
         conf_data = conf.read()
     with open(conf_file, 'w', encoding='utf8') as conf:

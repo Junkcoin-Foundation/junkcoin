@@ -833,7 +833,8 @@ static RPCHelpMan getblocktemplate()
             UniValue entry(UniValue::VOBJ);
             
             // Always include basic coinbase info
-            entry.pushKV("data", EncodeHexTx(tx));
+            // BIP 145: coinbasetxn data must be serialized without witness data
+            entry.pushKV("data", EncodeHexTx(tx, SERIALIZE_TRANSACTION_NO_WITNESS));
             entry.pushKV("txid", txHash.GetHex());
             entry.pushKV("hash", tx.GetWitnessHash().GetHex());
             entry.pushKV("required", true);
@@ -863,7 +864,8 @@ static RPCHelpMan getblocktemplate()
 
         UniValue entry(UniValue::VOBJ);
 
-        entry.pushKV("data", EncodeHexTx(tx));
+        // BIP 145: transaction data must be serialized without witness data
+        entry.pushKV("data", EncodeHexTx(tx, SERIALIZE_TRANSACTION_NO_WITNESS));
         entry.pushKV("txid", txHash.GetHex());
         entry.pushKV("hash", tx.GetWitnessHash().GetHex());
 
