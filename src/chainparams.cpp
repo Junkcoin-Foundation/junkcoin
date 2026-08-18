@@ -452,7 +452,7 @@ public:
         consensus.TaprootHeight = 0;
         consensus.DisabledScriptReactivationHeight = 0;
         ValidateOpcodeActivationOrdering(consensus);
-        consensus.MWEBHeight = 0;
+        consensus.MWEBHeight = 1; // 0 breaks regtest mining: genesis would be MWEB-enabled without a HogEx tx, so the first mined block can never validate
         consensus.mweb_pegout_feature_activation_height = 0;
         consensus.mweb_extradata_feature_activation_height = 0;
         consensus.MinBIP9WarningHeight = 0;
