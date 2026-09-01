@@ -995,7 +995,11 @@ static RPCHelpMan getblocktemplate()
 
     const auto& mweb_block = pblocktemplate->block.mweb_block;
     if (!mweb_block.IsNull()) {
-        result.pushKV("mweb", HexStr(mweb_block.m_block->Serialized()));
+        // Serialize the MWEB::Block wrapper (OptionalPtr null-flag + content),
+        // matching what CBlock::Unserialize reads back from submitted blocks.
+        CDataStream mweb_wire(SER_NETWORK, PROTOCOL_VERSION);
+        mweb_wire << mweb_block;
+        result.pushKV("mweb", HexStr(mweb_wire));
     }
 
     return result;
