@@ -864,8 +864,10 @@ static RPCHelpMan getblocktemplate()
 
         UniValue entry(UniValue::VOBJ);
 
-        // BIP 145: transaction data must be serialized without witness data
-        entry.pushKV("data", EncodeHexTx(tx, SERIALIZE_TRANSACTION_NO_WITNESS));
+        // Non-coinbase transaction data includes witness data (matching
+        // upstream Bitcoin/Litecoin Core). Only the coinbasetxn above is
+        // serialized without witness (BIP 145).
+        entry.pushKV("data", EncodeHexTx(tx));
         entry.pushKV("txid", txHash.GetHex());
         entry.pushKV("hash", tx.GetWitnessHash().GetHex());
 
