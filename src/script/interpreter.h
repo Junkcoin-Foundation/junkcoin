@@ -221,8 +221,26 @@ static constexpr size_t TAPROOT_CONTROL_NODE_SIZE = 32;
 static constexpr size_t TAPROOT_CONTROL_MAX_NODE_COUNT = 128;
 static constexpr size_t TAPROOT_CONTROL_MAX_SIZE = TAPROOT_CONTROL_BASE_SIZE + TAPROOT_CONTROL_NODE_SIZE * TAPROOT_CONTROL_MAX_NODE_COUNT;
 
+extern const CHashWriter HASHER_TAPLEAF;    //!< Hasher with tag "TapLeaf" pre-fed to it.
+extern const CHashWriter HASHER_TAPBRANCH;  //!< Hasher with tag "TapBranch" pre-fed to it.
+
 template <class T>
 uint256 SignatureHash(const CScript& scriptCode, const T& txTo, unsigned int nIn, int nHashType, const CAmount& amount, SigVersion sigversion, const PrecomputedTransactionData* cache = nullptr);
+
+/**
+ * Compute the BIP341 signature hash for a taproot/tapscript input.
+ *
+ * @param[out] hash_out Computed signature hash
+ * @param[in] execdata Script execution data (annex, tapleaf hash, ...), must be filled
+ * with the appropriate data for the input being signed.
+ * @param[in] tx_to The transaction being signed
+ * @param[in] in_pos Position of the input being signed
+ * @param[in] hash_type Signature hash type
+ * @param[in] sigversion SigVersion::TAPROOT or SigVersion::TAPSCRIPT
+ * @param[in] cache Precomputed transaction data
+ */
+template <class T>
+bool SignatureHashSchnorr(uint256& hash_out, const ScriptExecutionData& execdata, const T& tx_to, uint32_t in_pos, uint8_t hash_type, SigVersion sigversion, const PrecomputedTransactionData& cache);
 
 class BaseSignatureChecker
 {

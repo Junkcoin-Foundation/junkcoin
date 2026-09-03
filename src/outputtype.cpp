@@ -18,9 +18,10 @@
 static const std::string OUTPUT_TYPE_STRING_LEGACY = "legacy";
 static const std::string OUTPUT_TYPE_STRING_P2SH_SEGWIT = "p2sh-segwit";
 static const std::string OUTPUT_TYPE_STRING_BECH32 = "bech32";
+static const std::string OUTPUT_TYPE_STRING_BECH32M = "bech32m";
 static const std::string OUTPUT_TYPE_STRING_MWEB = "mweb";
 
-const std::array<OutputType, 4> OUTPUT_TYPES = {OutputType::LEGACY, OutputType::P2SH_SEGWIT, OutputType::BECH32, OutputType::MWEB};
+const std::array<OutputType, 5> OUTPUT_TYPES = {OutputType::LEGACY, OutputType::P2SH_SEGWIT, OutputType::BECH32, OutputType::BECH32M, OutputType::MWEB};
 
 bool ParseOutputType(const std::string& type, OutputType& output_type)
 {
@@ -32,6 +33,9 @@ bool ParseOutputType(const std::string& type, OutputType& output_type)
         return true;
     } else if (type == OUTPUT_TYPE_STRING_BECH32) {
         output_type = OutputType::BECH32;
+        return true;
+    } else if (type == OUTPUT_TYPE_STRING_BECH32M) {
+        output_type = OutputType::BECH32M;
         return true;
     } else if (type == OUTPUT_TYPE_STRING_MWEB) {
         output_type = OutputType::MWEB;
@@ -46,6 +50,7 @@ const std::string& FormatOutputType(OutputType type)
     case OutputType::LEGACY: return OUTPUT_TYPE_STRING_LEGACY;
     case OutputType::P2SH_SEGWIT: return OUTPUT_TYPE_STRING_P2SH_SEGWIT;
     case OutputType::BECH32: return OUTPUT_TYPE_STRING_BECH32;
+    case OutputType::BECH32M: return OUTPUT_TYPE_STRING_BECH32M;
     case OutputType::MWEB: return OUTPUT_TYPE_STRING_MWEB;
     } // no default case, so the compiler can warn about missing cases
     assert(false);
@@ -68,6 +73,11 @@ CTxDestination GetDestinationForKey(const CPubKey& key, OutputType type, const S
             return witdest;
         }
     }
+    case OutputType::BECH32M: {
+        // Key-path-only taproot (BIP341): v1 witness program of the x-only key.
+        if (!key.IsCompressed()) return PKHash(key);
+        return WitnessV1Taproot(XOnlyPubKey(Span<const unsigned char>{key}.subspan(1, 32)));
+    }
     case OutputType::MWEB: {
         PublicKey spend_pubkey(key.data());
         return StealthAddress(spend_pubkey.Mul(scan_secret), spend_pubkey);
@@ -83,12 +93,13 @@ std::vector<CTxDestination> GetAllDestinationsForKey(const CPubKey& key, const S
     if (key.IsCompressed()) {
         CTxDestination segwit = WitnessV0KeyHash(keyid);
         CTxDestination p2sh = ScriptHash(GetScriptForDestination(segwit));
+        CTxDestination taproot = GetDestinationForKey(key, OutputType::BECH32M, scan_secret);
 
         if (!scan_secret.IsNull()) {
             CTxDestination stealth = GetDestinationForKey(key, OutputType::MWEB, scan_secret);
-            return Vector(std::move(p2pkh), std::move(p2sh), std::move(segwit), std::move(stealth));
+            return Vector(std::move(p2pkh), std::move(p2sh), std::move(segwit), std::move(taproot), std::move(stealth));
         } else {
-            return Vector(std::move(p2pkh), std::move(p2sh), std::move(segwit));
+            return Vector(std::move(p2pkh), std::move(p2sh), std::move(segwit), std::move(taproot));
         }
     } else {
         return Vector(std::move(p2pkh));

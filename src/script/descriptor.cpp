@@ -569,9 +569,10 @@ public:
             case 1 /* PKHash */:
             case 2 /* ScriptHash */: return OutputType::LEGACY;
             case 3 /* WitnessV0ScriptHash */:
-            case 4 /* WitnessV0KeyHash */:
-            case 5 /* WitnessUnknown */: return OutputType::BECH32;
-            case 6 /* StealthAddress */: return OutputType::MWEB;
+            case 4 /* WitnessV0KeyHash */: return OutputType::BECH32;
+            case 5 /* WitnessV1Taproot */: return OutputType::BECH32M;
+            case 6 /* WitnessUnknown */: return OutputType::BECH32;
+            case 7 /* StealthAddress */: return OutputType::MWEB;
             case 0 /* CNoDestination */:
             default: return nullopt;
         }
@@ -598,9 +599,10 @@ public:
             case 1 /* PKHash */:
             case 2 /* ScriptHash */: return OutputType::LEGACY;
             case 3 /* WitnessV0ScriptHash */:
-            case 4 /* WitnessV0KeyHash */:
-            case 5 /* WitnessUnknown */: return OutputType::BECH32;
-            case 6 /* StealthAddress */: return OutputType::MWEB;
+            case 4 /* WitnessV0KeyHash */: return OutputType::BECH32;
+            case 5 /* WitnessV1Taproot */: return OutputType::BECH32M;
+            case 6 /* WitnessUnknown */: return OutputType::BECH32;
+            case 7 /* StealthAddress */: return OutputType::MWEB;
             case 0 /* CNoDestination */:
             default: return nullopt;
         }

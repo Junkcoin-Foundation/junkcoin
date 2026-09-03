@@ -1639,6 +1639,15 @@ void PrecomputedTransactionData::Init(const T& txTo, std::vector<CTxOut>&& spent
         }
         if (uses_bip341_taproot && uses_bip143_segwit) break; // No need to scan further if we already need all.
     }
+    if (m_spent_outputs_ready && !uses_bip341_taproot) {
+        for (size_t inpos = 0; inpos < m_spent_outputs.size(); ++inpos) {
+            if (m_spent_outputs[inpos].scriptPubKey.size() == 2 + WITNESS_V1_TAPROOT_SIZE &&
+                m_spent_outputs[inpos].scriptPubKey[0] == OP_1) {
+                uses_bip341_taproot = true;
+                break;
+            }
+        }
+    }
 
     if (uses_bip143_segwit || uses_bip341_taproot) {
         // Computations shared between both sighash schemes.
@@ -1672,8 +1681,8 @@ template PrecomputedTransactionData::PrecomputedTransactionData(const CTransacti
 template PrecomputedTransactionData::PrecomputedTransactionData(const CMutableTransaction& txTo);
 
 static const CHashWriter HASHER_TAPSIGHASH = TaggedHash("TapSighash");
-static const CHashWriter HASHER_TAPLEAF = TaggedHash("TapLeaf");
-static const CHashWriter HASHER_TAPBRANCH = TaggedHash("TapBranch");
+const CHashWriter HASHER_TAPLEAF = TaggedHash("TapLeaf");
+const CHashWriter HASHER_TAPBRANCH = TaggedHash("TapBranch");
 static const CHashWriter HASHER_TAPTWEAK = TaggedHash("TapTweak");
 
 template<typename T>

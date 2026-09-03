@@ -10,7 +10,9 @@
 #include <random.h>
 
 #include <secp256k1.h>
+#include <secp256k1_extrakeys.h>
 #include <secp256k1_recovery.h>
+#include <secp256k1_schnorrsig.h>
 
 static secp256k1_context* secp256k1_context_sign = nullptr;
 
@@ -227,6 +229,73 @@ bool CKey::Sign(const uint256 &hash, std::vector<unsigned char>& vchSig, bool gr
     secp256k1_ecdsa_signature_serialize_der(secp256k1_context_sign, vchSig.data(), &nSigLen, &sig);
     vchSig.resize(nSigLen);
     return true;
+}
+
+bool CKey::SignSchnorr(const uint256& hash, Span<unsigned char> sig, const uint256* merkle_root, const uint256& aux) const
+{
+    assert(sig.size() == 64);
+    if (!fValid) {
+        return false;
+    }
+    unsigned char seckey[32];
+    memcpy(seckey, begin(), 32);
+    if (!secp256k1_ec_seckey_verify(secp256k1_context_sign, seckey)) {
+        memory_cleanse(seckey, sizeof(seckey));
+        return false;
+    }
+
+    // Apply the BIP341 tweak to the private key, if a merkle root is given.
+    // The tweak is added to the even-Y-normalized secret key so that the
+    // resulting public key is the taproot output point.
+    if (merkle_root) {
+        secp256k1_pubkey pubkey;
+        if (!secp256k1_ec_pubkey_create(secp256k1_context_sign, &pubkey, seckey)) {
+            memory_cleanse(seckey, sizeof(seckey));
+            return false;
+        }
+        secp256k1_xonly_pubkey xonly;
+        int parity = -1;
+        if (!secp256k1_xonly_pubkey_from_pubkey(GetVerifyContext(), &xonly, &parity, &pubkey)) {
+            memory_cleanse(seckey, sizeof(seckey));
+            return false;
+        }
+        if (parity) {
+            secp256k1_ec_seckey_negate(secp256k1_context_sign, seckey);
+        }
+        unsigned char xonly_bytes[32];
+        if (!secp256k1_xonly_pubkey_serialize(GetVerifyContext(), xonly_bytes, &xonly)) {
+            memory_cleanse(seckey, sizeof(seckey));
+            memory_cleanse(xonly_bytes, sizeof(xonly_bytes));
+            return false;
+        }
+        uint256 tweak = XOnlyPubKey(xonly_bytes).ComputeTapTweakHash(merkle_root->IsNull() ? nullptr : merkle_root);
+        memory_cleanse(xonly_bytes, sizeof(xonly_bytes));
+        if (!secp256k1_ec_seckey_tweak_add(secp256k1_context_sign, seckey, tweak.begin())) {
+            memory_cleanse(seckey, sizeof(seckey));
+            return false;
+        }
+    }
+
+    // Sign with the BIP-340 algorithm. The secp256k1_schnorrsig_sign32_bip340
+    // entry point produces signatures that validate against the x-only
+    // public key of seckey using the BIP-340 tagged-hash challenge.
+    bool ret = secp256k1_schnorrsig_sign32_bip340(secp256k1_context_sign, sig.begin(), hash.begin(), seckey, aux.begin());
+    if (ret) {
+        // Additional verification step to prevent using a potentially corrupted signature.
+        secp256k1_pubkey pubkey;
+        secp256k1_xonly_pubkey xonly;
+        if (secp256k1_ec_pubkey_create(secp256k1_context_sign, &pubkey, seckey)
+            && secp256k1_xonly_pubkey_from_pubkey(GetVerifyContext(), &xonly, nullptr, &pubkey)) {
+            ret = secp256k1_schnorrsig_verify(GetVerifyContext(), sig.begin(), hash.begin(), &xonly);
+        } else {
+            ret = false;
+        }
+    }
+    memory_cleanse(seckey, sizeof(seckey));
+    if (!ret) {
+        memory_cleanse(sig.begin(), sig.size());
+    }
+    return ret;
 }
 
 bool CKey::VerifyPubKey(const CPubKey& pubkey) const {
