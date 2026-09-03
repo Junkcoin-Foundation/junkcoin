@@ -219,6 +219,109 @@ int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, secp256k1_schnorrsig
     return 1;
 }
 
+/* Create a BIP-340 Schnorr signature over a 32-byte message hash.
+ *
+ * See the declaration in include/secp256k1_schnorrsig.h for details. This
+ * signs exactly as specified in BIP-340: the challenge is a tagged hash over
+ * (r.x, x-only public key, msg32) and the nonce is derived with the BIP-340
+ * tagged hash functions (with optional auxiliary randomness). The existing
+ * secp256k1_schnorrsig_sign is intentionally left untouched so that the legacy
+ * (non-BIP-340, full-pubkey challenge) format used by the MimbleWimble
+ * Extension Blocks signatures keeps working. */
+int secp256k1_schnorrsig_sign32_bip340(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *msg32, const unsigned char *seckey32, const unsigned char *aux_rand32)
+{
+    secp256k1_scalar sk;
+    secp256k1_scalar e;
+    secp256k1_scalar k;
+    secp256k1_gej pkj;
+    secp256k1_gej rj;
+    secp256k1_ge pk;
+    secp256k1_ge r;
+    unsigned char buf[32];
+    unsigned char pk_buf[32];
+    unsigned char seckey[32];
+    int overflow;
+
+    VERIFY_CHECK(ctx != NULL);
+    ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
+    ARG_CHECK(sig64 != NULL);
+    ARG_CHECK(msg32 != NULL);
+    ARG_CHECK(seckey32 != NULL);
+
+    secp256k1_scalar_set_b32(&sk, seckey32, &overflow);
+    /* Fail if the secret key is invalid. */
+    if (overflow || secp256k1_scalar_is_zero(&sk)) {
+        memset(sig64, 0, 64);
+        return 0;
+    }
+
+    /* Compute the public key of the provided secret key. */
+    secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &pkj, &sk);
+    secp256k1_ge_set_gej(&pk, &pkj);
+
+    /* BIP-340 signs for the even-Y (x-only) public key. If the public key of
+     * the secret has odd Y, negate the secret key; the x coordinate (and thus
+     * the x-only public key) is unchanged by the negation. fe_is_odd requires
+     * a normalized field element. */
+    secp256k1_fe_normalize_var(&pk.y);
+    if (secp256k1_fe_is_odd(&pk.y)) {
+        secp256k1_scalar_negate(&sk, &sk);
+    }
+    secp256k1_scalar_get_b32(seckey, &sk);
+    secp256k1_fe_get_b32(pk_buf, &pk.x);
+
+    /* Derive the nonce k as specified in BIP-340. */
+    if (aux_rand32 == NULL) {
+        if (!nonce_function_bip340(buf, msg32, seckey, pk_buf, bip340_algo16, NULL)) {
+            memset(sig64, 0, 64);
+            memset(seckey, 0, sizeof(seckey));
+            secp256k1_scalar_clear(&sk);
+            return 0;
+        }
+    } else {
+        if (!nonce_function_bip340(buf, msg32, seckey, pk_buf, bip340_algo16, (void*)aux_rand32)) {
+            memset(sig64, 0, 64);
+            memset(seckey, 0, sizeof(seckey));
+            secp256k1_scalar_clear(&sk);
+            return 0;
+        }
+    }
+    secp256k1_scalar_set_b32(&k, buf, NULL);
+    if (secp256k1_scalar_is_zero(&k)) {
+        memset(sig64, 0, 64);
+        memset(seckey, 0, sizeof(seckey));
+        secp256k1_scalar_clear(&sk);
+        return 0;
+    }
+
+    secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &k);
+    secp256k1_ge_set_gej(&r, &rj);
+
+    /* BIP340 requires an even-Y nonce point; negate k if the y coordinate
+     * of R is odd. (Note: the criterion is parity, not quadratic
+     * residuosity, which is what the legacy draft-era Schnorr code used, and
+     * fe_is_odd additionally requires a normalized field element.) */
+    secp256k1_fe_normalize_var(&r.y);
+    if (secp256k1_fe_is_odd(&r.y)) {
+        secp256k1_scalar_negate(&k, &k);
+    }
+    secp256k1_fe_normalize(&r.x);
+    secp256k1_fe_get_b32(&sig64[0], &r.x);
+
+    /* Compute the challenge e = tagged_hash(r.x, pk.x, msg32) and
+     * s = k + e*sk (mod n). */
+    secp256k1_schnorrsig_challenge(&e, &sig64[0], msg32, pk_buf);
+    secp256k1_scalar_mul(&e, &e, &sk);
+    secp256k1_scalar_add(&e, &e, &k);
+    secp256k1_scalar_get_b32(&sig64[32], &e);
+
+    secp256k1_scalar_clear(&k);
+    secp256k1_scalar_clear(&sk);
+    secp256k1_scalar_clear(&e);
+    memset(seckey, 0, sizeof(seckey));
+    return 1;
+}
+
 /* Helper function for verification and batch verification.
  * Computes R = sG - eP. */
 static int secp256k1_schnorrsig_real_verify(const secp256k1_context* ctx, secp256k1_gej *rj, const secp256k1_scalar *s, const secp256k1_scalar *e, const secp256k1_pubkey *pk) {

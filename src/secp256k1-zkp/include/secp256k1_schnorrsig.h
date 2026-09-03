@@ -115,6 +115,31 @@ SECP256K1_API int secp256k1_schnorrsig_sign(
 	void* ndata
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
+/** Create a BIP-340 Schnorr signature over a 32-byte message hash.
+ *
+ *  This differs from secp256k1_schnorrsig_sign in that the output is computed
+ *  exactly as specified in BIP-340: the challenge is a tagged hash over the
+ *  x-only public key, and the nonce is derived with the BIP-340 tagged hash
+ *  functions. The input secret key is used as-is (any even-Y normalization is
+ *  performed internally), and the resulting signature validates against the
+ *  x-only public key of the provided secret key.
+ *
+ *  Returns 1 on success, 0 on failure.
+ *  Args:    ctx: pointer to a context object, initialized for signing (cannot be NULL)
+ *  Out:  sig64: pointer to the 64-byte signature buffer (cannot be NULL)
+ *  In:  msg32: the 32-byte message hash being signed (cannot be NULL)
+ *        seckey: pointer to a 32-byte secret key (cannot be NULL)
+ *    aux_rand32: pointer to 32 bytes of auxiliary randomness used in the nonce
+ *                derivation (can be NULL).
+ */
+SECP256K1_API SECP256K1_WARN_UNUSED_RESULT int secp256k1_schnorrsig_sign32_bip340(
+	const secp256k1_context* ctx,
+	unsigned char* sig64,
+	const unsigned char* msg32,
+	const unsigned char* seckey,
+	const unsigned char* aux_rand32
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
+
 /** Verify a Schnorr signature.
  *
  *  Returns: 1: correct signature
