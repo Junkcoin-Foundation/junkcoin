@@ -2276,11 +2276,12 @@ bool DescriptorScriptPubKeyMan::SetupDescriptorGeneration(const CExtKey& master_
     } // no default case, so the compiler can warn about missing cases
     assert(!desc_prefix.empty());
 
-    // Mainnet derives at 2', testnet and regtest derive at 1'
+    // Note: Descriptor wallets are currently disabled (WALLET_FLAG_DESCRIPTORS in CreateWallet).
+    // Mainnet derives at 2013' (Junkcoin SLIP-0044 coin type), testnet and regtest derive at 1'.
     if (Params().IsTestChain()) {
         desc_prefix += "/1'";
     } else {
-        desc_prefix += "/2'";
+        desc_prefix += "/2013'";
     }
 
     std::string internal_path = m_internal ? "/1" : "/0";

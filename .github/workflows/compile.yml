@@ -245,7 +245,7 @@ jobs:
         run: |
           eval "$(/opt/homebrew/bin/brew shellenv)"
           brew update
-          brew install automake libtool boost miniupnpc pkg-config python qt@5 libevent qrencode fmt berkeley-db@4 librsvg ccache
+          brew install automake libtool boost miniupnpc pkg-config python qt@5 libevent qrencode fmt berkeley-db@5 librsvg ccache
 
       - name: Cache ccache
         uses: actions/cache@v5
@@ -273,8 +273,8 @@ jobs:
             --disable-bench \
             --without-miniupnpc \
             --with-boost="$(brew --prefix boost)" \
-            BDB_CFLAGS="-I$(brew --prefix berkeley-db@4)/include" \
-            BDB_LIBS="-L$(brew --prefix berkeley-db@4)/lib -ldb_cxx-4.8" \
+            BDB_CFLAGS="-I$(brew --prefix berkeley-db@5)/include" \
+            BDB_LIBS="-L$(brew --prefix berkeley-db@5)/lib -ldb_cxx" \
             CPPFLAGS="-I/opt/homebrew/include" \
             LDFLAGS="-L/opt/homebrew/lib" \
             PKG_CONFIG_PATH="$(brew --prefix qt@5)/lib/pkgconfig:$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix libevent)/lib/pkgconfig:$(brew --prefix fmt)/lib/pkgconfig" \
