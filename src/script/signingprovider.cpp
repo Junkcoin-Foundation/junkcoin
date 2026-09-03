@@ -102,7 +102,22 @@ void FillableSigningProvider::ImplicitlyLearnRelatedKeyScripts(const CPubKey& pu
         // This does not use AddCScript, as it may be overridden.
         CScriptID id(script);
         mapScripts[id] = std::move(script);
+
+        XOnlyPubKey internal(pubkey);
+        TaprootBuilder builder;
+        builder.Finalize(internal);
+        WitnessV1Taproot output = builder.GetOutput();
+        tr_spenddata[output] = builder.GetSpendData();
+        TaprootSpendData raw_spenddata;
+        raw_spenddata.internal_key = internal;
+        tr_spenddata[WitnessV1Taproot(internal)] = std::move(raw_spenddata);
     }
+}
+
+bool FillableSigningProvider::GetTaprootSpendData(const XOnlyPubKey& output_key, TaprootSpendData& spenddata) const
+{
+    LOCK(cs_KeyStore);
+    return LookupHelper(tr_spenddata, output_key, spenddata);
 }
 
 bool FillableSigningProvider::GetPubKey(const CKeyID &address, CPubKey &vchPubKeyOut) const

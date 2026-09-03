@@ -142,6 +142,7 @@ protected:
      * it can't be solved and signed for.
      */
     ScriptMap mapScripts GUARDED_BY(cs_KeyStore);
+    std::map<XOnlyPubKey, TaprootSpendData> tr_spenddata GUARDED_BY(cs_KeyStore);
 
     void ImplicitlyLearnRelatedKeyScripts(const CPubKey& pubkey) EXCLUSIVE_LOCKS_REQUIRED(cs_KeyStore);
 
@@ -158,6 +159,7 @@ public:
     virtual bool HaveCScript(const CScriptID &hash) const override;
     virtual std::set<CScriptID> GetCScripts() const;
     virtual bool GetCScript(const CScriptID &hash, CScript& redeemScriptOut) const override;
+    bool GetTaprootSpendData(const XOnlyPubKey& output_key, TaprootSpendData& spenddata) const override;
 };
 
 /** Return the CKeyID of the key involved in a script (if there is a unique one). */

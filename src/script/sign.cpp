@@ -178,7 +178,12 @@ static bool SignTaproot(const SigningProvider& provider, const BaseSignatureCrea
     {
         std::vector<unsigned char> sig;
         if (sigdata.taproot_key_path_sig.size() == 0) {
-            if (creator.CreateSchnorrSig(provider, sig, spenddata.internal_key, nullptr, &spenddata.merkle_root, SigVersion::TAPROOT)) {
+            XOnlyPubKey key_to_sign = output;
+            if (!spenddata.internal_key.IsNull()) {
+                key_to_sign = spenddata.internal_key;
+            }
+            const uint256* merkle_root_ptr = (spenddata.internal_key.IsNull() || spenddata.internal_key == output) ? nullptr : &spenddata.merkle_root;
+            if (creator.CreateSchnorrSig(provider, sig, key_to_sign, nullptr, merkle_root_ptr, SigVersion::TAPROOT)) {
                 sigdata.taproot_key_path_sig = sig;
             }
         }

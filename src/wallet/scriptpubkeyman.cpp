@@ -140,7 +140,15 @@ IsMineResult IsMineInner(const LegacyScriptPubKeyMan& keystore, const CScript& s
         TaprootSpendData spenddata;
         XOnlyPubKey vOutKey(vSolutions[0]);
         if (keystore.GetTaprootSpendData(vOutKey, spenddata)) {
-            ret = std::max(ret, IsMineResult::SPENDABLE);
+            for (const auto& keyid : spenddata.internal_key.GetKeyIDs()) {
+                if (keystore.HaveKey(keyid)) {
+                    ret = std::max(ret, IsMineResult::SPENDABLE);
+                    break;
+                }
+            }
+            if (ret == IsMineResult::NO) {
+                ret = std::max(ret, IsMineResult::WATCH_ONLY);
+            }
         } else {
             for (const auto& keyid : vOutKey.GetKeyIDs()) {
                 if (keystore.HaveKey(keyid)) {
@@ -1092,17 +1100,24 @@ bool LegacyScriptPubKeyMan::GetWatchPubKey(const CKeyID &address, CPubKey &pubke
 bool LegacyScriptPubKeyMan::GetTaprootSpendData(const XOnlyPubKey& output_key, TaprootSpendData& spenddata) const
 {
     LOCK(cs_KeyStore);
-    // Since we don't store the tweaked output key, iterate over all wallet keys and
-    // check if any of them tweaks to the given output key (BIP341 key-path only).
-    for (const auto& mi : mapKeys) {
-        const CKey& key = mi.second;
-        XOnlyPubKey xonly = XOnlyPubKey(key.GetPubKey());
-        boost::optional<std::pair<XOnlyPubKey, bool>> tweak = xonly.CreateTapTweak(nullptr);
-        if (tweak && tweak->first == output_key) {
+    if (FillableSigningProvider::GetTaprootSpendData(output_key, spenddata)) {
+        return true;
+    }
+    for (const auto& mi : mapWatchKeys) {
+        const CPubKey& pubkey = mi.second;
+        if (pubkey.IsCompressed()) {
+            XOnlyPubKey internal(pubkey);
             TaprootBuilder builder;
-            builder.Finalize(xonly);
-            spenddata = builder.GetSpendData();
-            return true;
+            builder.Finalize(internal);
+            if (builder.GetOutput() == output_key) {
+                spenddata = builder.GetSpendData();
+                return true;
+            }
+            if (internal == output_key) {
+                spenddata.internal_key = internal;
+                spenddata.merkle_root.SetNull();
+                return true;
+            }
         }
     }
     return false;
@@ -1689,6 +1704,17 @@ std::vector<CKeyID> GetAffectedKeys(const DestinationAddr& spk, const SigningPro
 {
     if (spk.IsMWEB()) {
         return std::vector<CKeyID>{spk.GetMWEBAddress().GetSpendPubKey().GetID()};
+    }
+
+    CTxDestination dest;
+    if (spk.ExtractDestination(dest)) {
+        if (auto tr = boost::get<WitnessV1Taproot>(&dest)) {
+            TaprootSpendData spenddata;
+            if (provider.GetTaprootSpendData(*tr, spenddata) && !spenddata.internal_key.IsNull()) {
+                return spenddata.internal_key.GetKeyIDs();
+            }
+            return tr->GetKeyIDs();
+        }
     }
 
     std::vector<DestinationAddr> dummy;

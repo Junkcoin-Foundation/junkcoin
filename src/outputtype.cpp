@@ -74,9 +74,11 @@ CTxDestination GetDestinationForKey(const CPubKey& key, OutputType type, const S
         }
     }
     case OutputType::BECH32M: {
-        // Key-path-only taproot (BIP341): v1 witness program of the x-only key.
+        // Key-path-only taproot (BIP341): v1 witness program of the tweaked x-only key.
         if (!key.IsCompressed()) return PKHash(key);
-        return WitnessV1Taproot(XOnlyPubKey(Span<const unsigned char>{key}.subspan(1, 32)));
+        TaprootBuilder builder;
+        builder.Finalize(XOnlyPubKey(key));
+        return builder.GetOutput();
     }
     case OutputType::MWEB: {
         PublicKey spend_pubkey(key.data());
@@ -128,6 +130,7 @@ CTxDestination AddAndGetDestinationForScript(FillableSigningProvider& keystore, 
             return ScriptHash(witprog);
         }
     }
+    case OutputType::BECH32M:
     case OutputType::MWEB:
         assert(false);
     } // no default case, so the compiler can warn about missing cases
