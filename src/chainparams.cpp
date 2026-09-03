@@ -456,7 +456,7 @@ public:
         consensus.mweb_pegout_feature_activation_height = 0;
         consensus.mweb_extradata_feature_activation_height = 0;
         consensus.MinBIP9WarningHeight = 0;
-        consensus.powLimit = uint256S("0x00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // Match junkcoin-core
+        consensus.powLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // Match junkcoin-core
         consensus.nPowTargetTimespan = 4 * 60 * 60; // 4 hours - match junkcoin-core
         consensus.nPowTargetSpacing = 60; // Junkcoin: 1 minute block target
         consensus.fPowAllowMinDifficultyBlocks = false; // Match junkcoin-core base consensus
@@ -528,7 +528,7 @@ public:
         UpdateActivationParametersFromArgs(args);
 
         // Junkcoin regtest genesis - match junkcoin-core
-        genesis = CreateGenesisBlock(1369199888, 12097647, 0x1e0ffff0, 1, 50 * COIN);
+        genesis = CreateGenesisBlock(1296688602, 12097647, 0x207fffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
         // Junkcoin: No assertion for regtest (allows flexible testing)
 
