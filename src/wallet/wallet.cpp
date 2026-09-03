@@ -3375,7 +3375,7 @@ bool CWallet::GetNewDestination(const OutputType type, const std::string label, 
     const int currentHeight = GetLastBlockHeight();
     const Consensus::Params& consensus = Params().GetConsensus();
 
-    // Check SegWit activation for BECH32 and P2SH_SEGWIT addresses
+// Check SegWit activation for BECH32 and P2SH_SEGWIT addresses
     if ((type == OutputType::BECH32 || type == OutputType::P2SH_SEGWIT) && 
         currentHeight < consensus.SegwitHeight) {
         error = strprintf("SegWit addresses are not available until block %d (current: %d). "
@@ -3384,7 +3384,13 @@ bool CWallet::GetNewDestination(const OutputType type, const std::string label, 
         return false;
     }
 
-    // Note: Taproot (BECH32M) not supported in this codebase - OutputType doesn't have BECH32M
+    // Junkcoin: Taproot (BECH32M) addresses, gated on the taproot activation height
+    if (type == OutputType::BECH32M && currentHeight < consensus.TaprootHeight) {
+        error = strprintf("Taproot (bech32m) addresses are not available until block %d (current: %d). "
+                          "Using Taproot before activation makes funds vulnerable.",
+                          consensus.TaprootHeight, currentHeight);
+        return false;
+    }
 
     // Check MWEB activation for MWEB addresses
     if (type == OutputType::MWEB && currentHeight < consensus.MWEBHeight) {
@@ -3419,7 +3425,7 @@ bool CWallet::GetNewChangeDestination(const OutputType type, CTxDestination& des
     const int currentHeight = GetLastBlockHeight();
     const Consensus::Params& consensus = Params().GetConsensus();
 
-    // Check SegWit activation for BECH32 and P2SH_SEGWIT addresses
+// Check SegWit activation for BECH32 and P2SH_SEGWIT addresses
     if ((type == OutputType::BECH32 || type == OutputType::P2SH_SEGWIT) && 
         currentHeight < consensus.SegwitHeight) {
         error = strprintf("SegWit change addresses are not available until block %d (current: %d).",
@@ -3427,7 +3433,12 @@ bool CWallet::GetNewChangeDestination(const OutputType type, CTxDestination& des
         return false;
     }
 
-    // Note: Taproot (BECH32M) not supported in this codebase - OutputType doesn't have BECH32M
+    // Junkcoin: Taproot (BECH32M) change addresses, gated on the taproot activation height
+    if (type == OutputType::BECH32M && currentHeight < consensus.TaprootHeight) {
+        error = strprintf("Taproot (bech32m) change addresses are not available until block %d (current: %d).",
+                          consensus.TaprootHeight, currentHeight);
+        return false;
+    }
 
     // Check MWEB activation for MWEB addresses
     if (type == OutputType::MWEB && currentHeight < consensus.MWEBHeight) {

@@ -21,6 +21,10 @@ static KeyPurpose GetPurpose(const OutputType type, const bool internal)
         return KeyPurpose::MWEB;
     }
 
+    if (type == OutputType::BECH32M) {
+        return internal ? KeyPurpose::TAPROOT_CHANGE : KeyPurpose::TAPROOT;
+    }
+
     return internal ? KeyPurpose::INTERNAL : KeyPurpose::EXTERNAL;
 }
 
@@ -29,6 +33,8 @@ static const char* GetPurposeDesc(const KeyPurpose purpose)
     switch (purpose) {
     case KeyPurpose::EXTERNAL: return "external";
     case KeyPurpose::INTERNAL: return "internal";
+    case KeyPurpose::TAPROOT: return "taproot";
+    case KeyPurpose::TAPROOT_CHANGE: return "taproot_change";
     case KeyPurpose::MWEB: return "mweb";
     }
     assert(false);
@@ -39,6 +45,8 @@ static uint32_t* GetChainCounter(CHDChain& chain, const KeyPurpose purpose)
     switch (purpose) {
     case KeyPurpose::EXTERNAL: return &chain.nExternalChainCounter;
     case KeyPurpose::INTERNAL: return &chain.nInternalChainCounter;
+    case KeyPurpose::TAPROOT: return &chain.nTaprootExternalChainCounter;
+    case KeyPurpose::TAPROOT_CHANGE: return &chain.nTaprootInternalChainCounter;
     case KeyPurpose::MWEB: return &chain.nMWEBIndexCounter;
     }
     assert(false);
@@ -125,7 +133,24 @@ IsMineResult IsMineInner(const LegacyScriptPubKeyMan& keystore, const CScript& s
     case TxoutType::NONSTANDARD:
     case TxoutType::NULL_DATA:
     case TxoutType::WITNESS_UNKNOWN:
+        break;
     case TxoutType::WITNESS_V1_TAPROOT:
+    {
+        if (vSolutions.empty()) break;
+        TaprootSpendData spenddata;
+        XOnlyPubKey vOutKey(vSolutions[0]);
+        if (keystore.GetTaprootSpendData(vOutKey, spenddata)) {
+            ret = std::max(ret, IsMineResult::SPENDABLE);
+        } else {
+            for (const auto& keyid : vOutKey.GetKeyIDs()) {
+                if (keystore.HaveKey(keyid)) {
+                    ret = std::max(ret, IsMineResult::SPENDABLE);
+                    break;
+                }
+            }
+        }
+        break;
+    }
     case TxoutType::WITNESS_MWEB_PEGIN:
     case TxoutType::WITNESS_MWEB_HOGADDR:
         break;
@@ -401,11 +426,13 @@ void LegacyScriptPubKeyMan::MarkUnusedAddresses(const DestinationAddr& script)
                 KeyPurpose purpose = KeyPurpose::EXTERNAL;
                 if (!!meta.mweb_index) {
                     purpose = KeyPurpose::MWEB;
+                } else if (meta.key_origin.path.size() >= 5 && (meta.key_origin.path[1] & ~BIP32_HARDENED_KEY_LIMIT) == 2013 && meta.key_origin.path.size() == 5) {
+                    purpose = (meta.key_origin.path[3] & ~BIP32_HARDENED_KEY_LIMIT) ? KeyPurpose::TAPROOT_CHANGE : KeyPurpose::TAPROOT;
                 } else if ((meta.key_origin.path[1] & ~BIP32_HARDENED_KEY_LIMIT) != 0) {
                     purpose = KeyPurpose::INTERNAL;
                 }
 
-                int64_t index = !!meta.mweb_index ? *meta.mweb_index : (meta.key_origin.path[2] & ~BIP32_HARDENED_KEY_LIMIT);
+                int64_t index = !!meta.mweb_index ? *meta.mweb_index : (meta.key_origin.path.size() >= 5 ? (meta.key_origin.path[4] & ~BIP32_HARDENED_KEY_LIMIT) : (meta.key_origin.path[2] & ~BIP32_HARDENED_KEY_LIMIT));
 
                 if (!TopUpInactiveHDChain(meta.hd_seed_id, index, purpose)) {
                     WalletLogPrintf("%s: Adding inactive seed keys failed\n", __func__);
@@ -481,6 +508,10 @@ bool LegacyScriptPubKeyMan::CanGetAddresses(const KeyPurpose purpose) const
         }
 
         keypool_has_keys = set_mweb_keypool.size() > 0;
+    } else if (purpose == KeyPurpose::TAPROOT && m_storage.CanSupportFeature(FEATURE_HD_SPLIT)) {
+        keypool_has_keys = set_taproot_keypool.size() > 0;
+    } else if (purpose == KeyPurpose::TAPROOT_CHANGE && m_storage.CanSupportFeature(FEATURE_HD_SPLIT)) {
+        keypool_has_keys = set_taproot_change_keypool.size() > 0;
     } else {
         keypool_has_keys = KeypoolCountExternalKeys() > 0;
     }
@@ -588,13 +619,13 @@ int64_t LegacyScriptPubKeyMan::GetOldestKeyPoolTime() const
 size_t LegacyScriptPubKeyMan::KeypoolCountExternalKeys() const
 {
     LOCK(cs_KeyStore);
-    return setExternalKeyPool.size() + set_pre_split_keypool.size();
+    return setExternalKeyPool.size() + set_pre_split_keypool.size() + set_taproot_keypool.size();
 }
 
 unsigned int LegacyScriptPubKeyMan::GetKeyPoolSize() const
 {
     LOCK(cs_KeyStore);
-    return setInternalKeyPool.size() + setExternalKeyPool.size() + set_pre_split_keypool.size();
+    return setInternalKeyPool.size() + setExternalKeyPool.size() + set_pre_split_keypool.size() + set_taproot_keypool.size() + set_taproot_change_keypool.size();
 }
 
 int64_t LegacyScriptPubKeyMan::GetTimeFirstKey() const
@@ -1058,6 +1089,25 @@ bool LegacyScriptPubKeyMan::GetWatchPubKey(const CKeyID &address, CPubKey &pubke
     return false;
 }
 
+bool LegacyScriptPubKeyMan::GetTaprootSpendData(const XOnlyPubKey& output_key, TaprootSpendData& spenddata) const
+{
+    LOCK(cs_KeyStore);
+    // Since we don't store the tweaked output key, iterate over all wallet keys and
+    // check if any of them tweaks to the given output key (BIP341 key-path only).
+    for (const auto& mi : mapKeys) {
+        const CKey& key = mi.second;
+        XOnlyPubKey xonly = XOnlyPubKey(key.GetPubKey());
+        boost::optional<std::pair<XOnlyPubKey, bool>> tweak = xonly.CreateTapTweak(nullptr);
+        if (tweak && tweak->first == output_key) {
+            TaprootBuilder builder;
+            builder.Finalize(xonly);
+            spenddata = builder.GetSpendData();
+            return true;
+        }
+    }
+    return false;
+}
+
 bool LegacyScriptPubKeyMan::GetPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) const
 {
     LOCK(cs_KeyStore);
@@ -1140,6 +1190,48 @@ void LegacyScriptPubKeyMan::DeriveNewChildKey(WalletBatch& batch, CKeyMetadata& 
     // derive m/0'/0' (external chain) OR m/0'/1' (internal chain)
     assert(purpose == KeyPurpose::INTERNAL ? m_storage.CanSupportFeature(FEATURE_HD_SPLIT) : true);
     assert(purpose == KeyPurpose::MWEB ? m_storage.CanSupportFeature(FEATURE_HD_SPLIT) : true);
+    assert(purpose == KeyPurpose::TAPROOT || purpose == KeyPurpose::TAPROOT_CHANGE ? m_storage.CanSupportFeature(FEATURE_HD_SPLIT) : true);
+    if (purpose == KeyPurpose::TAPROOT || purpose == KeyPurpose::TAPROOT_CHANGE) {
+        // BIP86 taproot keys: m/86'/2013'/0'/{0,1}'/<n>' (hardened). This matches the
+        // derivation scheme used by the dedicated JKC mobile wallets.
+        const bool change = (purpose == KeyPurpose::TAPROOT_CHANGE);
+        hd_chain.nVersion = CHDChain::CURRENT_VERSION; // upgrade the DB model so the taproot chain counters are persisted
+        CExtKey purposeKey, coinKey, account86Key, chain86Key;
+        masterKey.Derive(purposeKey, 86 | BIP32_HARDENED_KEY_LIMIT);
+        purposeKey.Derive(coinKey, 2013 | BIP32_HARDENED_KEY_LIMIT);
+        coinKey.Derive(account86Key, BIP32_HARDENED_KEY_LIMIT);
+        account86Key.Derive(chain86Key, BIP32_HARDENED_KEY_LIMIT + (uint32_t)change);
+
+        // derive child key at next index, skip keys already known to the wallet
+        uint32_t& chain_counter = *GetChainCounter(hd_chain, purpose);
+
+        do {
+            // always derive hardened keys
+            CExtKey childKey; //key at m/86'/2013'/0'/{0,1}'/<n>'
+            chain86Key.Derive(childKey, chain_counter | BIP32_HARDENED_KEY_LIMIT);
+            metadata.hdKeypath = "m/86'/2013'/0'/" + ToString((uint32_t)change) + "'/" + ToString(chain_counter) + "'";
+            metadata.key_origin.path.push_back(86 | BIP32_HARDENED_KEY_LIMIT);
+            metadata.key_origin.path.push_back(2013 | BIP32_HARDENED_KEY_LIMIT);
+            metadata.key_origin.path.push_back(BIP32_HARDENED_KEY_LIMIT);
+            metadata.key_origin.path.push_back(((uint32_t)change) | BIP32_HARDENED_KEY_LIMIT);
+            metadata.key_origin.path.push_back(chain_counter | BIP32_HARDENED_KEY_LIMIT);
+            secret = childKey.key;
+
+            chain_counter++;
+        } while (HaveKey(secret.GetPubKey().GetID()));
+
+        metadata.hd_seed_id = hd_chain.seed_id;
+
+        CKeyID master_id = masterKey.key.GetPubKey().GetID();
+        std::copy(master_id.begin(), master_id.begin() + 4, metadata.key_origin.fingerprint);
+        metadata.has_key_origin = true;
+
+        // update the chain model in the database
+        if (hd_chain.seed_id == m_hd_chain.seed_id && !batch.WriteHDChain(hd_chain))
+            throw std::runtime_error(std::string(__func__) + ": writing HD chain model failed");
+        return;
+    }
+
     accountKey.Derive(chainChildKey, BIP32_HARDENED_KEY_LIMIT + (uint32_t)purpose);
 
     // derive child key at next index, skip keys already known to the wallet
@@ -1183,7 +1275,11 @@ void LegacyScriptPubKeyMan::DeriveNewChildKey(WalletBatch& batch, CKeyMetadata& 
 void LegacyScriptPubKeyMan::LoadKeyPool(int64_t nIndex, const CKeyPool &keypool)
 {
     LOCK(cs_KeyStore);
-    if (keypool.fMWEB) {
+    if (nIndex >= TAPROOT_POOL_BASE + TAPROOT_POOL_CHANGE_OFFSET) {
+        set_taproot_change_keypool.insert(nIndex);
+    } else if (nIndex >= TAPROOT_POOL_BASE) {
+        set_taproot_keypool.insert(nIndex);
+    } else if (keypool.fMWEB) {
         set_mweb_keypool.insert(nIndex);
     } else if (keypool.m_pre_split) {
         set_pre_split_keypool.insert(nIndex);
@@ -1295,6 +1391,16 @@ bool LegacyScriptPubKeyMan::NewKeyPool()
         }
         set_mweb_keypool.clear();
 
+        for (const int64_t nIndex : set_taproot_keypool) {
+            batch.ErasePool(nIndex);
+        }
+        set_taproot_keypool.clear();
+
+        for (const int64_t nIndex : set_taproot_change_keypool) {
+            batch.ErasePool(nIndex);
+        }
+        set_taproot_change_keypool.clear();
+
         m_pool_key_to_index.clear();
 
         if (!TopUp()) {
@@ -1327,29 +1433,36 @@ bool LegacyScriptPubKeyMan::TopUp(unsigned int kpSize)
         int64_t missingExternal = std::max(std::max((int64_t) nTargetSize, (int64_t) 1) - (int64_t)setExternalKeyPool.size(), (int64_t) 0);
         int64_t missingInternal = std::max(std::max((int64_t) nTargetSize, (int64_t) 1) - (int64_t)setInternalKeyPool.size(), (int64_t) 0);
         int64_t missingMWEB = std::max(std::max((int64_t) nTargetSize, (int64_t) 1) - (int64_t)set_mweb_keypool.size(), (int64_t) 0);
+        int64_t missingTaproot = std::max(std::max((int64_t) nTargetSize, (int64_t) 1) - (int64_t)set_taproot_keypool.size(), (int64_t) 0);
+        int64_t missingTaprootChange = std::max(std::max((int64_t) nTargetSize, (int64_t) 1) - (int64_t)set_taproot_change_keypool.size(), (int64_t) 0);
 
         if (!IsHDEnabled() || !m_storage.CanSupportFeature(FEATURE_HD_SPLIT)) {
             // don't create extra internal keys
             missingInternal = 0;
+            missingTaprootChange = 0;
         }
         if (m_mwebKeychain == nullptr) {
             missingMWEB = 0;
         }
         WalletBatch batch(m_storage.GetDatabase());
-        for (int64_t i = missingInternal + missingExternal + missingMWEB; i--;)
+        for (int64_t i = missingInternal + missingExternal + missingMWEB + missingTaproot + missingTaprootChange; i--;)
         {
             KeyPurpose purpose = KeyPurpose::EXTERNAL;
             if (i < missingInternal) {
                 purpose = KeyPurpose::INTERNAL;
             } else if (i < (missingInternal + missingMWEB)) {
                 purpose = KeyPurpose::MWEB;
+            } else if (i < (missingInternal + missingMWEB + missingTaproot)) {
+                purpose = KeyPurpose::TAPROOT;
+            } else if (i < (missingInternal + missingMWEB + missingTaproot + missingTaprootChange)) {
+                purpose = KeyPurpose::TAPROOT_CHANGE;
             }
 
             CPubKey pubkey(GenerateNewKey(batch, m_hd_chain, purpose));
             AddKeypoolPubkeyWithDB(pubkey, purpose, batch);
         }
-        if (missingInternal + missingExternal + missingMWEB > 0) {
-            WalletLogPrintf("keypool added %d keys (%d internal, %d MWEB), size=%u (%u internal, %u MWEB)\n", missingInternal + missingExternal + missingMWEB, missingInternal, missingMWEB, setInternalKeyPool.size() + setExternalKeyPool.size() + set_pre_split_keypool.size() + set_mweb_keypool.size(), setInternalKeyPool.size(), set_mweb_keypool.size());
+        if (missingInternal + missingExternal + missingMWEB + missingTaproot + missingTaprootChange > 0) {
+            WalletLogPrintf("keypool added %d keys (%d internal, %d MWEB, %d taproot, %d taproot_change), size=%u (%u internal, %u MWEB, %u taproot, %u taproot_change)\n", missingInternal + missingExternal + missingMWEB + missingTaproot + missingTaprootChange, missingInternal, missingMWEB, missingTaproot, missingTaprootChange, setInternalKeyPool.size() + setExternalKeyPool.size() + set_pre_split_keypool.size() + set_mweb_keypool.size() + set_taproot_keypool.size() + set_taproot_change_keypool.size(), setInternalKeyPool.size(), set_mweb_keypool.size(), set_taproot_keypool.size(), set_taproot_change_keypool.size());
         }
     }
     NotifyCanGetAddressesChanged();
@@ -1360,14 +1473,25 @@ void LegacyScriptPubKeyMan::AddKeypoolPubkeyWithDB(const CPubKey& pubkey, const 
 {
     LOCK(cs_KeyStore);
     assert(m_max_keypool_index < std::numeric_limits<int64_t>::max()); // How in the hell did you use so many keys?
-    int64_t index = ++m_max_keypool_index;
-    if (!batch.WritePool(index, CKeyPool(pubkey, purpose == KeyPurpose::INTERNAL, purpose == KeyPurpose::MWEB))) {
+    int64_t index;
+    if (purpose == KeyPurpose::TAPROOT) {
+        index = TAPROOT_POOL_BASE + (m_hd_chain.nTaprootExternalChainCounter - 1);
+    } else if (purpose == KeyPurpose::TAPROOT_CHANGE) {
+        index = TAPROOT_POOL_BASE + TAPROOT_POOL_CHANGE_OFFSET + (m_hd_chain.nTaprootInternalChainCounter - 1);
+    } else {
+        index = ++m_max_keypool_index;
+    }
+    if (!batch.WritePool(index, CKeyPool(pubkey, purpose == KeyPurpose::INTERNAL || purpose == KeyPurpose::TAPROOT_CHANGE, purpose == KeyPurpose::MWEB))) {
         throw std::runtime_error(std::string(__func__) + ": writing imported pubkey failed");
     }
     if (purpose == KeyPurpose::INTERNAL) {
         setInternalKeyPool.insert(index);
     } else if (purpose == KeyPurpose::MWEB) {
         set_mweb_keypool.insert(index);
+    } else if (purpose == KeyPurpose::TAPROOT) {
+        set_taproot_keypool.insert(index);
+    } else if (purpose == KeyPurpose::TAPROOT_CHANGE) {
+        set_taproot_change_keypool.insert(index);
     } else {
         setExternalKeyPool.insert(index);
     }
@@ -1396,6 +1520,10 @@ void LegacyScriptPubKeyMan::ReturnDestination(int64_t nIndex, const KeyPurpose p
             setInternalKeyPool.insert(nIndex);
         } else if (purpose == KeyPurpose::MWEB) {
             set_mweb_keypool.insert(nIndex);
+        } else if (purpose == KeyPurpose::TAPROOT) {
+            set_taproot_keypool.insert(nIndex);
+        } else if (purpose == KeyPurpose::TAPROOT_CHANGE) {
+            set_taproot_change_keypool.insert(nIndex);
         } else if (!set_pre_split_keypool.empty()) {
             set_pre_split_keypool.insert(nIndex);
         } else {
@@ -1438,14 +1566,17 @@ bool LegacyScriptPubKeyMan::ReserveKeyFromKeyPool(int64_t& nIndex, CKeyPool& key
     {
         LOCK(cs_KeyStore);
 
-        bool fReturningInternal = (purpose == KeyPurpose::INTERNAL);
+        bool fReturningInternal = (purpose == KeyPurpose::INTERNAL || purpose == KeyPurpose::TAPROOT_CHANGE);
         fReturningInternal &= (IsHDEnabled() && m_storage.CanSupportFeature(FEATURE_HD_SPLIT)) || m_storage.IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS);
         bool fMWEB = (purpose == KeyPurpose::MWEB) && IsHDEnabled() && m_storage.CanSupportFeature(FEATURE_HD_SPLIT);
-        bool use_pre_split = !fMWEB && !set_pre_split_keypool.empty();
+        bool fTaproot = (purpose == KeyPurpose::TAPROOT || purpose == KeyPurpose::TAPROOT_CHANGE) && IsHDEnabled() && m_storage.CanSupportFeature(FEATURE_HD_SPLIT);
+        bool use_pre_split = !fMWEB && !fTaproot && !set_pre_split_keypool.empty();
 
-        auto fn_get_keypool = [this](const bool internal, const bool mweb) -> std::set<int64_t>& {
+        auto fn_get_keypool = [this](const bool internal, const bool mweb, const bool taproot) -> std::set<int64_t>& {
              if (mweb) {
                 return set_mweb_keypool;
+             } else if (taproot) {
+                return internal ? set_taproot_change_keypool : set_taproot_keypool;
              } else if (!set_pre_split_keypool.empty()) {
                  return set_pre_split_keypool;
              } else if (internal) {
@@ -1455,7 +1586,7 @@ bool LegacyScriptPubKeyMan::ReserveKeyFromKeyPool(int64_t& nIndex, CKeyPool& key
             return setExternalKeyPool;
         };
 
-        std::set<int64_t>& setKeyPool = fn_get_keypool(fReturningInternal, fMWEB);
+        std::set<int64_t>& setKeyPool = fn_get_keypool(fReturningInternal, fMWEB, fTaproot);
 
         // Get the oldest key
         if (setKeyPool.empty()) {
@@ -1516,13 +1647,19 @@ void LegacyScriptPubKeyMan::MarkReserveKeysAsUsed(int64_t keypool_id)
     AssertLockHeld(cs_KeyStore);
     bool mweb = set_mweb_keypool.count(keypool_id);
     bool internal = !mweb && setInternalKeyPool.count(keypool_id);
-    if (!internal && !mweb) assert(setExternalKeyPool.count(keypool_id) || set_pre_split_keypool.count(keypool_id));
+    bool taproot = !mweb && !internal && set_taproot_keypool.count(keypool_id);
+    bool taproot_change = !mweb && !internal && !taproot && set_taproot_change_keypool.count(keypool_id);
+    if (!internal && !mweb && !taproot && !taproot_change) assert(setExternalKeyPool.count(keypool_id) || set_pre_split_keypool.count(keypool_id));
 
     std::set<int64_t>* setKeyPool = nullptr;
     if (mweb) {
         setKeyPool = &set_mweb_keypool;
     } else if (internal) {
         setKeyPool = &setInternalKeyPool;
+    } else if (taproot) {
+        setKeyPool = &set_taproot_keypool;
+    } else if (taproot_change) {
+        setKeyPool = &set_taproot_change_keypool;
     } else {
         setKeyPool = (set_pre_split_keypool.empty() ? &setExternalKeyPool : &set_pre_split_keypool);
     }
@@ -1538,7 +1675,7 @@ void LegacyScriptPubKeyMan::MarkReserveKeysAsUsed(int64_t keypool_id)
             m_pool_key_to_index.erase(keypool.vchPubKey.GetID());
         }
 
-        if (!mweb) {
+        if (!mweb && !taproot && !taproot_change) {
             LearnAllRelatedScripts(keypool.vchPubKey);
         }
 
@@ -2100,6 +2237,10 @@ bool DescriptorScriptPubKeyMan::SetupDescriptorGeneration(const CExtKey& master_
     }
     case OutputType::BECH32: {
         desc_prefix = "wpkh(" + xpub + "/84'";
+        break;
+    }
+    case OutputType::BECH32M: {
+        desc_prefix = "tr(" + xpub + "/86'";
         break;
     }
     case OutputType::MWEB: {

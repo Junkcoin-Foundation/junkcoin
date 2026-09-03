@@ -28,6 +28,8 @@ enum class KeyPurpose : uint32_t
 {
     EXTERNAL = 0,
     INTERNAL = 1,
+    TAPROOT = 2,
+    TAPROOT_CHANGE = 3,
     MWEB = 100
 };
 
@@ -53,6 +55,12 @@ public:
 
 //! Default for -keypool
 static const unsigned int DEFAULT_KEYPOOL_SIZE = 1000;
+
+// Junkcoin: taproot keypool entries are stored under a dedicated index range so their
+// purpose can be recovered when loading from disk, without changing the CKeyPool
+// serialization format (which would otherwise break wallets created by older versions).
+static constexpr int64_t TAPROOT_POOL_BASE = (int64_t)1 << 58;
+static constexpr int64_t TAPROOT_POOL_CHANGE_OFFSET = (int64_t)1 << 57;
 
 std::vector<CKeyID> GetAffectedKeys(const DestinationAddr& spk, const SigningProvider& provider);
 
@@ -334,6 +342,8 @@ private:
     std::set<int64_t> setExternalKeyPool GUARDED_BY(cs_KeyStore);
     std::set<int64_t> set_pre_split_keypool GUARDED_BY(cs_KeyStore);
     std::set<int64_t> set_mweb_keypool GUARDED_BY(cs_KeyStore);
+    std::set<int64_t> set_taproot_keypool GUARDED_BY(cs_KeyStore);
+    std::set<int64_t> set_taproot_change_keypool GUARDED_BY(cs_KeyStore);
     int64_t m_max_keypool_index GUARDED_BY(cs_KeyStore) = 0;
     std::map<CKeyID, int64_t> m_pool_key_to_index;
     // Tracks keypool indexes to CKeyIDs of keys that have been taken out of the keypool but may be returned to it
@@ -471,6 +481,7 @@ public:
     bool GetPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) const override;
     bool AddCScript(const CScript& redeemScript) override;
     bool GetKeyOrigin(const CKeyID& keyid, KeyOriginInfo& info) const override;
+    bool GetTaprootSpendData(const XOnlyPubKey& output_key, TaprootSpendData& spenddata) const override;
 
     //! Load a keypool entry
     void LoadKeyPool(int64_t nIndex, const CKeyPool &keypool);

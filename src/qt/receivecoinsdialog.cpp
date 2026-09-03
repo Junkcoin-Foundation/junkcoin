@@ -108,7 +108,10 @@ void ReceiveCoinsDialog::setModel(WalletModel *_model)
             ui->addressTypeCombo->addItem(tr("Wrapped SegWit (P2SH)"), static_cast<int>(OutputType::P2SH_SEGWIT));
         }
         
-        // Note: Taproot (BECH32M) not supported - OutputType doesn't have BECH32M
+        // Only show Taproot option if activated
+        if (currentHeight >= consensus.TaprootHeight) {
+            ui->addressTypeCombo->addItem(tr("Taproot (Bech32m)"), static_cast<int>(OutputType::BECH32M));
+        }
         
         // Only show MWEB option if activated
         if (currentHeight >= consensus.MWEBHeight) {

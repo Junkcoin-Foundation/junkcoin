@@ -263,6 +263,17 @@ public:
         return obj;
     }
 
+    UniValue operator()(const WitnessV1Taproot& id) const
+    {
+        UniValue obj(UniValue::VOBJ);
+        obj.pushKV("isscript", false);
+        obj.pushKV("iswitness", true);
+        obj.pushKV("witness_version", 1);
+        obj.pushKV("witness_program", HexStr(Span<const unsigned char>(id.begin(), id.end())));
+        obj.pushKV("ismweb", false);
+        return obj;
+    }
+
     UniValue operator()(const WitnessUnknown& id) const
     {
         UniValue obj(UniValue::VOBJ);

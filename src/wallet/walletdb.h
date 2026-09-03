@@ -92,6 +92,8 @@ public:
     uint32_t nExternalChainCounter;
     uint32_t nInternalChainCounter;
     uint32_t nMWEBIndexCounter;
+    uint32_t nTaprootExternalChainCounter;
+    uint32_t nTaprootInternalChainCounter;
     CKeyID seed_id; //!< seed hash160
     boost::optional<SecretKey> mweb_scan_key;
 
@@ -99,7 +101,8 @@ public:
     static const int VERSION_HD_CHAIN_SPLIT = 2;
     static const int VERSION_HD_MWEB        = 3;
     static const int VERSION_HD_MWEB_WATCH  = 4;
-    static const int CURRENT_VERSION        = VERSION_HD_MWEB_WATCH;
+    static const int VERSION_HD_TAPROOT     = 5;
+    static const int CURRENT_VERSION        = VERSION_HD_TAPROOT;
     int nVersion;
 
     CHDChain() { SetNull(); }
@@ -118,6 +121,10 @@ public:
         if (obj.nVersion >= VERSION_HD_MWEB_WATCH) {
             READWRITE(obj.mweb_scan_key);
         }
+
+        if (obj.nVersion >= VERSION_HD_TAPROOT) {
+            READWRITE(obj.nTaprootExternalChainCounter, obj.nTaprootInternalChainCounter);
+        }
     }
 
     void SetNull()
@@ -126,6 +133,8 @@ public:
         nExternalChainCounter = 0;
         nInternalChainCounter = 0;
         nMWEBIndexCounter = 0;
+        nTaprootExternalChainCounter = 0;
+        nTaprootInternalChainCounter = 0;
         seed_id.SetNull();
         mweb_scan_key = boost::none;
     }
