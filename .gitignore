@@ -9,10 +9,21 @@ src/litecoin-gui
 src/litecoin-node
 src/litecoin-tx
 src/litecoin-wallet
+src/junkcoin
+src/junkcoind
+src/junkcoin-cli
+src/junkcoin-gui
+src/junkcoin-node
+src/junkcoin-tx
+src/junkcoin-wallet
+src/bench/bench_junkcoin
 src/test/fuzz/*
 !src/test/fuzz/*.*
 src/test/test_litecoin
 src/qt/test/test_litecoin-qt
+src/test/test_junkcoin
+src/qt/junkcoin-qt
+src/qt/test/test_junkcoin-qt
 
 # autoreconf
 Makefile.in
