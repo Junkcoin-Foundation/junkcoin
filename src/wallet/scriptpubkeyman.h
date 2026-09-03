@@ -567,6 +567,7 @@ public:
     bool GetKey(const CKeyID &address, CKey& key) const override { return false; }
     bool HaveKey(const CKeyID &address) const override { return false; }
     bool GetKeyOrigin(const CKeyID& keyid, KeyOriginInfo& info) const override { return m_spk_man.GetKeyOrigin(keyid, info); }
+    bool GetTaprootSpendData(const XOnlyPubKey& output_key, TaprootSpendData& spenddata) const override { return m_spk_man.GetTaprootSpendData(output_key, spenddata); }
 };
 
 class DescriptorScriptPubKeyMan : public ScriptPubKeyMan

@@ -487,7 +487,11 @@ void CoinControlDialog::updateLabels(CCoinControl& m_coin_control, WalletModel *
             int witnessversion = 0;
             std::vector<unsigned char> witnessprogram;
             if (scriptPubKey.IsWitnessProgram(witnessversion, witnessprogram)) {
-                nBytesInputs += (32 + 4 + 1 + (107 / WITNESS_SCALE_FACTOR) + 4);
+                if (witnessversion == 1 && witnessprogram.size() == 32) {
+                    nBytesInputs += (32 + 4 + 1 + (66 / WITNESS_SCALE_FACTOR) + 4);
+                } else {
+                    nBytesInputs += (32 + 4 + 1 + (107 / WITNESS_SCALE_FACTOR) + 4);
+                }
                 fWitness = true;
             } else if (ExtractDestination(scriptPubKey, address)) {
                 CPubKey pubkey;
