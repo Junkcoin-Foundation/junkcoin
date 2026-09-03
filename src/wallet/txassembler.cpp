@@ -677,12 +677,18 @@ OutputType TxAssembler::GetChangeType(const InProcessTx& new_tx) const
         return OutputType::LEGACY;
     }
 
-    // If any destination is P2WPKH or P2WSH, use P2WPKH for the change output.
+    // If any destination is P2WPKH, P2WSH, or Taproot, use matching witness type for the change output.
     for (const auto& recipient : new_tx.recipients) {
         if (!recipient.IsMWEB()) {
             int witnessversion = 0;
             std::vector<unsigned char> witnessprogram;
             if (recipient.GetScript().IsWitnessProgram(witnessversion, witnessprogram)) {
+                if (witnessversion == 1 && witnessprogram.size() == 32) {
+                    const int currentHeight = m_wallet.GetLastBlockHeight();
+                    if (currentHeight >= Params().GetConsensus().TaprootHeight) {
+                        return OutputType::BECH32M;
+                    }
+                }
                 return OutputType::BECH32;
             }
         }
