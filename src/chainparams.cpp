@@ -82,16 +82,13 @@ public:
         consensus.BIP34Hash = uint256S("0xa2effa738145e377e08a61d76179c21703e13e48910b30a2a87f0dfe794b64c6"); // genesis
         consensus.BIP65Height = 0x210c; // 8460
         consensus.BIP66Height = 0x210c; // 8460
-        consensus.CSVHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
-        // Junkcoin: SegWit disabled
-        consensus.SegwitHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
-        // Junkcoin: Taproot disabled
-        consensus.TaprootHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
+        consensus.CSVHeight = std::numeric_limits<int>::max(); // Pending mainnet activation
+        consensus.SegwitHeight = std::numeric_limits<int>::max(); // Pending mainnet activation
         // Junkcoin: Re-enable legacy disabled opcodes (OP_CAT, OP_MUL, etc.)
-        consensus.DisabledScriptReactivationHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
+        consensus.DisabledScriptReactivationHeight = std::numeric_limits<int>::max(); // Pending mainnet activation
+        consensus.TaprootHeight = std::numeric_limits<int>::max(); // Pending mainnet activation
         ValidateOpcodeActivationOrdering(consensus);
-        // Junkcoin: MWEB disabled
-        consensus.MWEBHeight = std::numeric_limits<int>::max(); // Disabled (legacy core state)
+        consensus.MWEBHeight = std::numeric_limits<int>::max(); // Pending mainnet activation
         consensus.mweb_pegout_feature_activation_height = consensus.MWEBHeight;
         consensus.mweb_extradata_feature_activation_height = consensus.MWEBHeight;
         consensus.MinBIP9WarningHeight = 10080 + 10080; // miner confirmation window
